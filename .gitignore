@@ -269,3 +269,7 @@ exclude_dll.txt
 
 # clangd index
 .cache/
+
+# Nix
+/result
+/result-*
