@@ -99,7 +99,6 @@ include(cmake/scripts/common/DependencyOptions.cmake)
 # general
 option(VERBOSE            "Enable verbose output?" OFF)
 option(VERBOSE_FIND       "Enable verbose output of library searches only?" OFF)
-option(ENABLE_BLURAY_JAR "Enable building libbluray jar libraries (requires ENABLE_INTERNAL_BLURAY=ON)?" ON)
 option(ENABLE_CLANGTIDY   "Enable clang-tidy support?" OFF)
 option(ENABLE_CPPCHECK    "Enable cppcheck support?" OFF)
 option(ENABLE_DVDCSS      "Enable libdvdcss support?" ON)
@@ -128,6 +127,7 @@ dependent_option(ENABLE_INTERNAL_EXIV2 "Enable internal exiv2?")
 dependent_option(ENABLE_INTERNAL_FLATBUFFERS "Enable internal flatbuffers?")
 dependent_option(ENABLE_INTERNAL_FMT "Enable internal fmt?")
 dependent_option(ENABLE_INTERNAL_LCMS2  "Enable internal lcms2?")
+dependent_option(ENABLE_INTERNAL_LIBDVD  "Enable internal libdvd libraries?")
 dependent_option(ENABLE_INTERNAL_LIBMICROHTTPD  "Enable internal libmicrohttpd?")
 dependent_option(ENABLE_INTERNAL_LZO2 "Enable internal lzo2?")
 dependent_option(ENABLE_INTERNAL_NFS "Enable internal libnfs?")
@@ -273,7 +273,7 @@ set(optional_deps Alsa>=1.0.27
                   Bluetooth
                   Bluray>=0.9.3
                   CAP
-                  CEC>=4.0.0
+                  CEC>=7.0.0
                   DBus
                   Iso9660pp>=2.1.0
                   LCMS2>=2.10
@@ -390,10 +390,10 @@ endif()
 if(WIN32)
   configure_file(${CMAKE_SOURCE_DIR}/xbmc/platform/win32/XBMC_PC.rc.in
                  ${CORE_BUILD_DIR}/xbmc/platform/win32/XBMC_PC.rc @ONLY)
-  add_library(resources OBJECT ${CORE_BUILD_DIR}/xbmc/platform/win32/XBMC_PC.rc)
-  set_target_properties(resources PROPERTIES FOLDER "Build Utilities")
-  target_include_directories(resources PRIVATE ${CMAKE_SOURCE_DIR}/tools/windows/packaging/media)
-  set(RESOURCES $<TARGET_OBJECTS:resources>)
+  add_library(windows_resources OBJECT ${CORE_BUILD_DIR}/xbmc/platform/win32/XBMC_PC.rc)
+  set_target_properties(windows_resources PROPERTIES FOLDER "Build Utilities")
+  target_include_directories(windows_resources PRIVATE ${CMAKE_SOURCE_DIR}/tools/windows/packaging/media)
+  set(RESOURCES $<TARGET_OBJECTS:windows_resources>)
 endif()
 
 # Generate messages
@@ -598,6 +598,30 @@ if(HOST_CAN_EXECUTE_TARGET AND ENABLE_TESTING)
   # Enable unit-test related targets
   enable_testing()
   gtest_add_tests(${APP_NAME_LC}-test "" ${test_sources})
+  find_program(TEST_DPKG_DEB_EXECUTABLE NAMES dpkg-deb)
+  find_program(TEST_RSYNC_EXECUTABLE NAMES rsync)
+  if(TEST_DPKG_DEB_EXECUTABLE AND TEST_RSYNC_EXECUTABLE)
+    foreach(_test_platform IN ITEMS iphoneos appletvos)
+      if(_test_platform STREQUAL iphoneos)
+        set(_test_device iOS)
+        set(_test_bundle_identifier org.xbmc.kodi-ios)
+        set(_test_architecture iphoneos-arm)
+      else()
+        set(_test_device tvOS)
+        set(_test_bundle_identifier org.xbmc.kodi-tvos)
+        set(_test_architecture appletvos-arm64)
+      endif()
+      add_test(NAME TestDarwinEmbeddedDebPackaging${_test_device}
+               COMMAND ${CMAKE_COMMAND}
+                       -DKODI_SOURCE_DIR=${CMAKE_SOURCE_DIR}
+                       -DTEST_BINARY_DIR=${CMAKE_BINARY_DIR}/test
+                       -DDPKG_DEB_EXECUTABLE=${TEST_DPKG_DEB_EXECUTABLE}
+                       -DTEST_PLATFORM=${_test_platform}
+                       -DTEST_BUNDLE_IDENTIFIER=${_test_bundle_identifier}
+                       -DTEST_ARCHITECTURE=${_test_architecture}
+                       -P ${CMAKE_SOURCE_DIR}/tools/darwin/packaging/darwin_embedded/test/TestDebPackaging.cmake)
+    endforeach()
+  endif()
   add_custom_target(check ${CMAKE_CTEST_COMMAND} WORKING_DIRECTORY ${PROJECT_BINARY_DIR})
   add_dependencies(check ${APP_NAME_LC}-test)
 

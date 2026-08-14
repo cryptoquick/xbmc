@@ -7,17 +7,24 @@
  */
 
 #include "FileItem.h"
+#include "FileItemList.h"
 #include "LangInfo.h"
 #include "ServiceBroker.h"
 #include "URL.h"
+#include "Util.h"
+#include "filesystem/Directory.h"
 #include "media/MediaType.h"
+#include "platform/Filesystem.h"
 #include "resources/LocalizeStrings.h"
 #include "resources/ResourcesComponent.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
 #include "settings/lib/SettingsManager.h"
+#include "utils/URIUtils.h"
 #include "video/VideoInfoTag.h"
+
+#include <fstream>
 
 #include <gtest/gtest.h>
 
@@ -30,6 +37,7 @@ struct TestFileData
   const char* file;
   bool use_folder;
   const char* base;
+  const char* base2{};
 };
 
 struct TestNameData
@@ -37,6 +45,7 @@ struct TestNameData
   const char* file;
   bool use_folder;
   const char* name;
+  const char* name2{};
 };
 
 class AdvancedSettingsResetBase : public Test
@@ -195,11 +204,11 @@ const TestFileData BaseMovies[] = {
     {"zip://smb%3a%2f%2fsomepath%2fmovies%2fmovie.zip/movie/film.avi", false,
      "zip://smb%3a%2f%2fsomepath%2fmovies%2fmovie.zip/movie/film.avi"},
     {"zip://smb%3a%2f%2fsomepath%2fmovies%2ffilm.zip/movie/film.avi", true,
-     "zip://smb%3a%2f%2fsomepath%2fmovies%2ffilm.zip/movie/"},
+     "zip://smb%3a%2f%2fsomepath%2fmovies%2ffilm.zip/movie/", "smb://somepath/movies/"},
     {"zip://smb%3a%2f%2fsomepath%2fmovies%2fmovies.zip/movie/BDMV/index.bdmv", false,
      "zip://smb%3a%2f%2fsomepath%2fmovies%2fmovies.zip/movie/"},
     {"zip://smb%3a%2f%2fsomepath%2fmovies%2fmovies.zip/movie/BDMV/index.bdmv", true,
-     "zip://smb%3a%2f%2fsomepath%2fmovies%2fmovies.zip/movie/"},
+     "zip://smb%3a%2f%2fsomepath%2fmovies%2fmovies.zip/movie/", "smb://somepath/movies/"},
     {"zip://smb%3a%2f%2fsomepath%2fmovie%2fdisc%201%2fmovie_disc.zip/BDMV/index.bdmv", false,
      "smb://somepath/movie/disc 1/movie_disc.zip"},
     {"zip://smb%3a%2f%2fsomepath%2fmovie%2fdisc%201%2fmovie_disc.zip/BDMV/index.bdmv", true,
@@ -218,11 +227,11 @@ const TestFileData BaseMovies[] = {
     {"rar://smb%3a%2f%2fsomepath%2fmovies%2fmovie.rar/movie/film.avi", false,
      "rar://smb%3a%2f%2fsomepath%2fmovies%2fmovie.rar/movie/film.avi"},
     {"rar://smb%3a%2f%2fsomepath%2fmovies%2ffilm.rar/movie/film.avi", true,
-     "rar://smb%3a%2f%2fsomepath%2fmovies%2ffilm.rar/movie/"},
+     "rar://smb%3a%2f%2fsomepath%2fmovies%2ffilm.rar/movie/", "smb://somepath/movies/"},
     {"rar://smb%3a%2f%2fsomepath%2fmovies%2fmovies.rar/movie/BDMV/index.bdmv", false,
      "rar://smb%3a%2f%2fsomepath%2fmovies%2fmovies.rar/movie/"},
     {"rar://smb%3a%2f%2fsomepath%2fmovies%2fmovies.rar/movie/BDMV/index.bdmv", true,
-     "rar://smb%3a%2f%2fsomepath%2fmovies%2fmovies.rar/movie/"},
+     "rar://smb%3a%2f%2fsomepath%2fmovies%2fmovies.rar/movie/", "smb://somepath/movies/"},
     {"rar://smb%3a%2f%2fsomepath%2fmovie%2fdisc%201%2fmovie_disc.rar/BDMV/index.bdmv", false,
      "smb://somepath/movie/disc 1/movie_disc.rar"},
     {"rar://smb%3a%2f%2fsomepath%2fmovie%2fdisc%201%2fmovie_disc.rar/BDMV/index.bdmv", true,
@@ -242,11 +251,11 @@ const TestFileData BaseMovies[] = {
     {"archive://smb%3a%2f%2fsomepath%2fmovies%2fmovie.tar.gz/movie/film.avi", false,
      "archive://smb%3a%2f%2fsomepath%2fmovies%2fmovie.tar.gz/movie/film.avi"},
     {"archive://smb%3a%2f%2fsomepath%2fmovies%2ffilm.tar.gz/movie/film.avi", true,
-     "archive://smb%3a%2f%2fsomepath%2fmovies%2ffilm.tar.gz/movie/"},
+     "archive://smb%3a%2f%2fsomepath%2fmovies%2ffilm.tar.gz/movie/", "smb://somepath/movies/"},
     {"archive://smb%3a%2f%2fsomepath%2fmovies%2fmovies.tar.gz/movie/BDMV/index.bdmv", false,
      "archive://smb%3a%2f%2fsomepath%2fmovies%2fmovies.tar.gz/movie/"},
     {"archive://smb%3a%2f%2fsomepath%2fmovies%2fmovies.tar.gz/movie/BDMV/index.bdmv", true,
-     "archive://smb%3a%2f%2fsomepath%2fmovies%2fmovies.tar.gz/movie/"},
+     "archive://smb%3a%2f%2fsomepath%2fmovies%2fmovies.tar.gz/movie/", "smb://somepath/movies/"},
     {"archive://smb%3a%2f%2fsomepath%2fmovie%2fdisc%201%2fmovie_disc.tar.gz/BDMV/index.bdmv", false,
      "smb://somepath/movie/disc 1/movie_disc.tar.gz"},
     {"archive://smb%3a%2f%2fsomepath%2fmovie%2fdisc%201%2fmovie_disc.tar.gz/BDMV/index.bdmv", true,
@@ -279,11 +288,11 @@ const TestFileData BaseMovies[] = {
     {"zip://%2fsomepath%2fmovies%2fmovie.zip/movie/film.avi", false,
      "zip://%2fsomepath%2fmovies%2fmovie.zip/movie/film.avi"},
     {"zip://%2fsomepath%2fmovies%2ffilm.zip/movie/film.avi", true,
-     "zip://%2fsomepath%2fmovies%2ffilm.zip/movie/"},
+     "zip://%2fsomepath%2fmovies%2ffilm.zip/movie/", "/somepath/movies/"},
     {"zip://%2fsomepath%2fmovies%2fmovies.zip/movie/BDMV/index.bdmv", false,
      "zip://%2fsomepath%2fmovies%2fmovies.zip/movie/"},
     {"zip://%2fsomepath%2fmovies%2fmovies.zip/movie/BDMV/index.bdmv", true,
-     "zip://%2fsomepath%2fmovies%2fmovies.zip/movie/"},
+     "zip://%2fsomepath%2fmovies%2fmovies.zip/movie/", "/somepath/movies/"},
     {"zip://%2fsomepath%2fdisc%201%2fmovie.zip/BDMV/index.bdmv", false,
      "/somepath/disc 1/movie.zip"},
     {"zip://%2fsomepath%2fdisc%201%2fmovie.zip/BDMV/index.bdmv", true, "/somepath/"},
@@ -298,11 +307,11 @@ const TestFileData BaseMovies[] = {
     {"rar://%2fsomepath%2fmovies%2fmovie.rar/movie/film.avi", false,
      "rar://%2fsomepath%2fmovies%2fmovie.rar/movie/film.avi"},
     {"rar://%2fsomepath%2fmovies%2ffilm.rar/movie/film.avi", true,
-     "rar://%2fsomepath%2fmovies%2ffilm.rar/movie/"},
+     "rar://%2fsomepath%2fmovies%2ffilm.rar/movie/", "/somepath/movies/"},
     {"rar://%2fsomepath%2fmovies%2fmovies.rar/movie/BDMV/index.bdmv", false,
      "rar://%2fsomepath%2fmovies%2fmovies.rar/movie/"},
     {"rar://%2fsomepath%2fmovies%2fmovies.rar/movie/BDMV/index.bdmv", true,
-     "rar://%2fsomepath%2fmovies%2fmovies.rar/movie/"},
+     "rar://%2fsomepath%2fmovies%2fmovies.rar/movie/", "/somepath/movies/"},
     {"rar://%2fsomepath%2fdisc%201%2fmovie_disc.rar/BDMV/index.bdmv", false,
      "/somepath/disc 1/movie_disc.rar"},
     {"rar://%2fsomepath%2fdisc%201%2fmovie_disc.rar/BDMV/index.bdmv", true, "/somepath/"},
@@ -319,11 +328,11 @@ const TestFileData BaseMovies[] = {
     {"archive://%2fsomepath%2fmovies%2fmovie.tar.gz/movie/film.avi", false,
      "archive://%2fsomepath%2fmovies%2fmovie.tar.gz/movie/film.avi"},
     {"archive://%2fsomepath%2fmovies%2ffilm.tar.gz/movie/film.avi", true,
-     "archive://%2fsomepath%2fmovies%2ffilm.tar.gz/movie/"},
+     "archive://%2fsomepath%2fmovies%2ffilm.tar.gz/movie/", "/somepath/movies/"},
     {"archive://%2fsomepath%2fmovies%2fmovies.tar.gz/movie/BDMV/index.bdmv", false,
      "archive://%2fsomepath%2fmovies%2fmovies.tar.gz/movie/"},
     {"archive://%2fsomepath%2fmovies%2fmovies.tar.gz/movie/BDMV/index.bdmv", true,
-     "archive://%2fsomepath%2fmovies%2fmovies.tar.gz/movie/"},
+     "archive://%2fsomepath%2fmovies%2fmovies.tar.gz/movie/", "/somepath/movies/"},
     {"archive://%2fsomepath%2fdisc%201%2fmovie.tar.gz/BDMV/index.bdmv", false,
      "/somepath/disc 1/movie.tar.gz"},
     {"archive://%2fsomepath%2fdisc%201%2fmovie.tar.gz/BDMV/index.bdmv", true, "/somepath/"},
@@ -356,11 +365,11 @@ const TestFileData BaseMovies[] = {
     {"zip://D%3a%5cmovies%5cmovie%5cmovie.zip/movie/film.avi", false,
      "zip://D%3a%5cmovies%5cmovie%5cmovie.zip/movie/film.avi"},
     {"zip://D%3a%5cmovies%5cmovie%5cfilm.zip/movie/film.avi", true,
-     "zip://D%3a%5cmovies%5cmovie%5cfilm.zip/movie/"},
+     "zip://D%3a%5cmovies%5cmovie%5cfilm.zip/movie/", "D:\\movies\\movie\\"},
     {"zip://D%3a%5cmovies%5cmovies.zip/movie/BDMV/index.bdmv", false,
      "zip://D%3a%5cmovies%5cmovies.zip/movie/"},
     {"zip://D%3a%5cmovies%5cmovies.zip/movie/BDMV/index.bdmv", true,
-     "zip://D%3a%5cmovies%5cmovies.zip/movie/"},
+     "zip://D%3a%5cmovies%5cmovies.zip/movie/", "D:\\movies\\"},
     {"zip://D%3a%5cmovies%5cmovie%5cdisc%201%5cmovie.zip/BDMV/index.bdmv", false,
      "D:\\movies\\movie\\disc 1\\movie.zip"},
     {"zip://D%3a%5cmovies%5cmovie%5cdisc%201%5cmovie.zip/BDMV/index.bdmv", true,
@@ -377,11 +386,11 @@ const TestFileData BaseMovies[] = {
     {"rar://D%3a%5cmovies%5cmovie%5cmovie.rar/movie/film.avi", false,
      "rar://D%3a%5cmovies%5cmovie%5cmovie.rar/movie/film.avi"},
     {"rar://D%3a%5cmovies%5cmovie%5cfilm.rar/movie/film.avi", true,
-     "rar://D%3a%5cmovies%5cmovie%5cfilm.rar/movie/"},
+     "rar://D%3a%5cmovies%5cmovie%5cfilm.rar/movie/", "D:\\movies\\movie\\"},
     {"rar://D%3a%5cmovies%5cmovies.rar/movie/BDMV/index.bdmv", false,
      "rar://D%3a%5cmovies%5cmovies.rar/movie/"},
     {"rar://D%3a%5cmovies%5cmovies.rar/movie/BDMV/index.bdmv", true,
-     "rar://D%3a%5cmovies%5cmovies.rar/movie/"},
+     "rar://D%3a%5cmovies%5cmovies.rar/movie/", "D:\\movies\\"},
     {"rar://D%3a%5cmovies%5cmovie%5cdisc%201%5cmovie.rar/BDMV/index.bdmv", false,
      "D:\\movies\\movie\\disc 1\\movie.rar"},
     {"rar://D%3a%5cmovies%5cmovie%5cdisc%201%5cmovie.rar/BDMV/index.bdmv", true,
@@ -398,11 +407,11 @@ const TestFileData BaseMovies[] = {
     {"archive://D%3a%5cmovies%5cmovie%5cmovie.tar.gz/movie/film.avi", false,
      "archive://D%3a%5cmovies%5cmovie%5cmovie.tar.gz/movie/film.avi"},
     {"archive://D%3a%5cmovies%5cmovie%5cfilm.tar.gz/movie/film.avi", true,
-     "archive://D%3a%5cmovies%5cmovie%5cfilm.tar.gz/movie/"},
+     "archive://D%3a%5cmovies%5cmovie%5cfilm.tar.gz/movie/", "D:\\movies\\movie\\"},
     {"archive://D%3a%5cmovies%5cmovies.tar.gz/movie/BDMV/index.bdmv", false,
      "archive://D%3a%5cmovies%5cmovies.tar.gz/movie/"},
     {"archive://D%3a%5cmovies%5cmovies.tar.gz/movie/BDMV/index.bdmv", true,
-     "archive://D%3a%5cmovies%5cmovies.tar.gz/movie/"},
+     "archive://D%3a%5cmovies%5cmovies.tar.gz/movie/", "D:\\movies\\"},
     {"archive://D%3a%5cmovies%5cmovie%5cdisc%201%5cmovie.tar.gz/BDMV/index.bdmv", false,
      "D:\\movies\\movie\\disc 1\\movie.tar.gz"},
     {"archive://D%3a%5cmovies%5cmovie%5cdisc%201%5cmovie.tar.gz/BDMV/index.bdmv", true,
@@ -444,11 +453,11 @@ const TestFileData BaseMovies[] = {
     {"zip://%5c%5cServer%5cMovies%5cmovie%5cmovie.zip/movie/film.avi", false,
      "zip://%5c%5cServer%5cMovies%5cmovie%5cmovie.zip/movie/film.avi"},
     {"zip://%5c%5cServer%5cMovies%5cmovie%5cfilm.zip/movie/film.avi", true,
-     "zip://%5c%5cServer%5cMovies%5cmovie%5cfilm.zip/movie/"},
+     "zip://%5c%5cServer%5cMovies%5cmovie%5cfilm.zip/movie/", "\\\\Server\\Movies\\movie\\"},
     {"zip://%5c%5cServer%5cMovies%5cmovies.zip/movie/BDMV/index.bdmv", false,
      "zip://%5c%5cServer%5cMovies%5cmovies.zip/movie/"},
     {"zip://%5c%5cServer%5cMovies%5cmovies.zip/movie/BDMV/index.bdmv", true,
-     "zip://%5c%5cServer%5cMovies%5cmovies.zip/movie/"},
+     "zip://%5c%5cServer%5cMovies%5cmovies.zip/movie/", "\\\\Server\\Movies\\"},
     {"zip://%5c%5cServer%5cMovies%5cMovie%5cdisc%201%5cmovie.zip/BDMV/index.bdmv", false,
      "\\\\Server\\Movies\\Movie\\disc 1\\movie.zip"},
     {"zip://%5c%5cServer%5cMovies%5cMovie%5cdisc%201%5cmovie.zip/BDMV/index.bdmv", true,
@@ -467,11 +476,11 @@ const TestFileData BaseMovies[] = {
     {"rar://%5c%5cServer%5cMovies%5cmovie%5cmovie.rar/movie/film.avi", false,
      "rar://%5c%5cServer%5cMovies%5cmovie%5cmovie.rar/movie/film.avi"},
     {"rar://%5c%5cServer%5cMovies%5cmovie%5cfilm.rar/movie/film.avi", true,
-     "rar://%5c%5cServer%5cMovies%5cmovie%5cfilm.rar/movie/"},
+     "rar://%5c%5cServer%5cMovies%5cmovie%5cfilm.rar/movie/", "\\\\Server\\Movies\\movie\\"},
     {"rar://%5c%5cServer%5cMovies%5cmovies.rar/movie/BDMV/index.bdmv", false,
      "rar://%5c%5cServer%5cMovies%5cmovies.rar/movie/"},
     {"rar://%5c%5cServer%5cMovies%5cmovies.rar/movie/BDMV/index.bdmv", true,
-     "rar://%5c%5cServer%5cMovies%5cmovies.rar/movie/"},
+     "rar://%5c%5cServer%5cMovies%5cmovies.rar/movie/", "\\\\Server\\Movies\\"},
     {"rar://%5c%5cServer%5cMovies%5cMovie%5cdisc%201%5cmovie.rar/BDMV/index.bdmv", false,
      "\\\\Server\\Movies\\Movie\\disc 1\\movie.rar"},
     {"rar://%5c%5cServer%5cMovies%5cMovie%5cdisc%201%5cmovie.rar/BDMV/index.bdmv", true,
@@ -491,11 +500,11 @@ const TestFileData BaseMovies[] = {
     {"archive://%5c%5cServer%5cMovies%5cmovie%5cmovie.tar.gz/movie/film.avi", false,
      "archive://%5c%5cServer%5cMovies%5cmovie%5cmovie.tar.gz/movie/film.avi"},
     {"archive://%5c%5cServer%5cMovies%5cmovie%5cfilm.tar.gz/movie/film.avi", true,
-     "archive://%5c%5cServer%5cMovies%5cmovie%5cfilm.tar.gz/movie/"},
+     "archive://%5c%5cServer%5cMovies%5cmovie%5cfilm.tar.gz/movie/", "\\\\Server\\Movies\\movie\\"},
     {"archive://%5c%5cServer%5cMovies%5cmovies.tar.gz/movie/BDMV/index.bdmv", false,
      "archive://%5c%5cServer%5cMovies%5cmovies.tar.gz/movie/"},
     {"archive://%5c%5cServer%5cMovies%5cmovies.tar.gz/movie/BDMV/index.bdmv", true,
-     "archive://%5c%5cServer%5cMovies%5cmovies.tar.gz/movie/"},
+     "archive://%5c%5cServer%5cMovies%5cmovies.tar.gz/movie/", "\\\\Server\\Movies\\"},
     {"archive://%5c%5cServer%5cMovies%5cMovie%5cdisc%201%5cmovie.tar.gz/BDMV/index.bdmv", false,
      "\\\\Server\\Movies\\Movie\\disc 1\\movie.tar.gz"},
     {"archive://%5c%5cServer%5cMovies%5cMovie%5cdisc%201%5cmovie.tar.gz/BDMV/index.bdmv", true,
@@ -503,11 +512,24 @@ const TestFileData BaseMovies[] = {
 
 TEST_P(TestFileItemBasePath, GetBaseMoviePath)
 {
+  const auto settings = CServiceBroker::GetSettingsComponent();
+  const bool old = settings->GetAdvancedSettings()->m_ignoreFolderNamesInArchives;
+  settings->GetAdvancedSettings()->m_ignoreFolderNamesInArchives = false;
+
   CFileItem item;
   item.SetPath(GetParam().file);
-  std::string path = CURL(item.GetBaseMoviePath(GetParam().use_folder)).Get();
-  std::string compare = CURL(GetParam().base).Get();
+  std::string path = item.GetBaseMoviePath(GetParam().use_folder);
+  std::string compare = GetParam().base;
   EXPECT_EQ(compare, path);
+
+  settings->GetAdvancedSettings()->m_ignoreFolderNamesInArchives = true;
+
+  item.SetPath(GetParam().file);
+  path = item.GetBaseMoviePath(GetParam().use_folder);
+  compare = GetParam().base2 ? GetParam().base2 : GetParam().base;
+  EXPECT_EQ(compare, path);
+
+  settings->GetAdvancedSettings()->m_ignoreFolderNamesInArchives = old;
 }
 
 INSTANTIATE_TEST_SUITE_P(BaseNameMovies, TestFileItemBasePath, ValuesIn(BaseMovies));
@@ -613,9 +635,10 @@ const TestNameData BaseNames[] = {
     {"zip://smb%3a%2f%2fsomepath%2fmovie%2fmovie.zip/film.avi", false, "film"},
     {"zip://smb%3a%2f%2fsomepath%2fmovie%2ffilm.zip/film.avi", true, "movie"},
     {"zip://smb%3a%2f%2fsomepath%2fmovies%2fmovie.zip/movie/film.avi", false, "film"},
-    {"zip://smb%3a%2f%2fsomepath%2fmovies%2ffilm.zip/movie/film.avi", true, "movie"},
+    {"zip://smb%3a%2f%2fsomepath%2fmovies%2ffilm.zip/movie/film.avi", true, "movie", "movies"},
     {"zip://smb%3a%2f%2fsomepath%2fmovies%2fmovies.zip/movie/BDMV/index.bdmv", false, "movie"},
-    {"zip://smb%3a%2f%2fsomepath%2fmovies%2fmovies.zip/movie/BDMV/index.bdmv", true, "movie"},
+    {"zip://smb%3a%2f%2fsomepath%2fmovies%2fmovies.zip/movie/BDMV/index.bdmv", true, "movie",
+     "movies"},
     {"zip://smb%3a%2f%2fsomepath%2fmovie%2fdisc%201%2ffilm.zip/BDMV/index.bdmv", false, "film"},
     {"zip://smb%3a%2f%2fsomepath%2fmovie%2fdisc%201%2ffilm.zip/BDMV/index.bdmv", true, "movie"},
     //
@@ -626,9 +649,10 @@ const TestNameData BaseNames[] = {
     {"rar://smb%3a%2f%2fsomepath%2fmovie%2fmovie.rar/film.avi", false, "film"},
     {"rar://smb%3a%2f%2fsomepath%2fmovie%2ffilm.rar/film.avi", true, "movie"},
     {"rar://smb%3a%2f%2fsomepath%2fmovies%2fmovie.rar/movie/film.avi", false, "film"},
-    {"rar://smb%3a%2f%2fsomepath%2fmovies%2ffilm.rar/movie/film.avi", true, "movie"},
+    {"rar://smb%3a%2f%2fsomepath%2fmovies%2ffilm.rar/movie/film.avi", true, "movie", "movies"},
     {"rar://smb%3a%2f%2fsomepath%2fmovies%2fmovies.rar/movie/BDMV/index.bdmv", false, "movie"},
-    {"rar://smb%3a%2f%2fsomepath%2fmovies%2fmovies.rar/movie/BDMV/index.bdmv", true, "movie"},
+    {"rar://smb%3a%2f%2fsomepath%2fmovies%2fmovies.rar/movie/BDMV/index.bdmv", true, "movie",
+     "movies"},
     {"rar://smb%3a%2f%2fsomepath%2fmovie%2fdisc%201%2ffilm.rar/BDMV/index.bdmv", false, "film"},
     {"rar://smb%3a%2f%2fsomepath%2fmovie%2fdisc%201%2ffilm.rar/BDMV/index.bdmv", true, "movie"},
     //
@@ -639,11 +663,12 @@ const TestNameData BaseNames[] = {
     {"archive://smb%3a%2f%2fsomepath%2fmovie%2fmovie.tar.gz/film.avi", false, "film"},
     {"archive://smb%3a%2f%2fsomepath%2fmovie%2ffilm.tar.gz/film.avi", true, "movie"},
     {"archive://smb%3a%2f%2fsomepath%2fmovies%2fmovie.tar.gz/movie/film.avi", false, "film"},
-    {"archive://smb%3a%2f%2fsomepath%2fmovies%2ffilm.tar.gz/movie/film.avi", true, "movie"},
+    {"archive://smb%3a%2f%2fsomepath%2fmovies%2ffilm.tar.gz/movie/film.avi", true, "movie",
+     "movies"},
     {"archive://smb%3a%2f%2fsomepath%2fmovies%2fmovies.tar.gz/movie/BDMV/index.bdmv", false,
      "movie"},
-    {"archive://smb%3a%2f%2fsomepath%2fmovies%2fmovies.tar.gz/movie/BDMV/index.bdmv", true,
-     "movie"},
+    {"archive://smb%3a%2f%2fsomepath%2fmovies%2fmovies.tar.gz/movie/BDMV/index.bdmv", true, "movie",
+     "movies"},
     {"archive://smb%3a%2f%2fsomepath%2fmovie%2fdisc%201%2ffilm.tar.gz/BDMV/index.bdmv", false,
      "film"},
     {"archive://smb%3a%2f%2fsomepath%2fmovie%2fdisc%201%2ffilm.tar.gz/BDMV/index.bdmv", true,
@@ -668,9 +693,9 @@ const TestNameData BaseNames[] = {
     {"zip://%2fsomepath%2fmovie%2fmovie.zip/film.avi", false, "film"},
     {"zip://%2fsomepath%2fmovie%2ffilm.zip/film.avi", true, "movie"},
     {"zip://%2fsomepath%2fmovies%2fmovie.zip/movie/film.avi", false, "film"},
-    {"zip://%2fsomepath%2fmovies%2ffilm.zip/movie/film.avi", true, "movie"},
+    {"zip://%2fsomepath%2fmovies%2ffilm.zip/movie/film.avi", true, "movie", "movies"},
     {"zip://%2fsomepath%2fmovies%2fmovies.zip/movie/BDMV/index.bdmv", false, "movie"},
-    {"zip://%2fsomepath%2fmovies%2fmovies.zip/movie/BDMV/index.bdmv", true, "movie"},
+    {"zip://%2fsomepath%2fmovies%2fmovies.zip/movie/BDMV/index.bdmv", true, "movie", "movies"},
     {"zip://%2fsomepath%2fmovie%2fmovie%2fdisc%201%2ffilm.zip/BDMV/index.bdmv", false, "film"},
     {"zip://%2fsomepath%2fmovie%2fmovie%2fdisc%201%2ffilm.zip/BDMV/index.bdmv", true, "movie"},
     //
@@ -681,9 +706,9 @@ const TestNameData BaseNames[] = {
     {"rar://%2fsomepath%2fmovie%2fmovie.rar/film.avi", false, "film"},
     {"rar://%2fsomepath%2fmovie%2ffilm.rar/film.avi", true, "movie"},
     {"rar://%2fsomepath%2fmovies%2fmovie.rar/movie/film.avi", false, "film"},
-    {"rar://%2fsomepath%2fmovies%2ffilm.rar/movie/film.avi", true, "movie"},
+    {"rar://%2fsomepath%2fmovies%2ffilm.rar/movie/film.avi", true, "movie", "movies"},
     {"rar://%2fsomepath%2fmovies%2fmovies.rar/movie/BDMV/index.bdmv", false, "movie"},
-    {"rar://%2fsomepath%2fmovies%2fmovies.rar/movie/BDMV/index.bdmv", true, "movie"},
+    {"rar://%2fsomepath%2fmovies%2fmovies.rar/movie/BDMV/index.bdmv", true, "movie", "movies"},
     {"rar://%2fsomepath%2fmovie%2fdisc%201%2ffilm.rar/BDMV/index.bdmv", false, "film"},
     {"rar://%2fsomepath%2fmovie%2fdisc%201%2ffilm.rar/BDMV/index.bdmv", true, "movie"},
     //
@@ -694,9 +719,10 @@ const TestNameData BaseNames[] = {
     {"archive://%2fsomepath%2fmovie%2fmovie.tar.gz/film.avi", false, "film"},
     {"archive://%2fsomepath%2fmovie%2ffilm.tar.gz/film.avi", true, "movie"},
     {"archive://%2fsomepath%2fmovies%2fmovie.tar.gz/movie/film.avi", false, "film"},
-    {"archive://%2fsomepath%2fmovies%2ffilm.tar.gz/movie/film.avi", true, "movie"},
+    {"archive://%2fsomepath%2fmovies%2ffilm.tar.gz/movie/film.avi", true, "movie", "movies"},
     {"archive://%2fsomepath%2fmovies%2fmovies.tar.gz/movie/BDMV/index.bdmv", false, "movie"},
-    {"archive://%2fsomepath%2fmovies%2fmovies.tar.gz/movie/BDMV/index.bdmv", true, "movie"},
+    {"archive://%2fsomepath%2fmovies%2fmovies.tar.gz/movie/BDMV/index.bdmv", true, "movie",
+     "movies"},
     {"archive://%2fsomepath%2fmovie%2fdisc%201%2ffilm.tar.gz/BDMV/index.bdmv", false, "film"},
     {"archive://%2fsomepath%2fmovie%2fdisc%201%2ffilm.tar.gz/BDMV/index.bdmv", true, "movie"},
     // Embedded DOS path tests
@@ -720,9 +746,9 @@ const TestNameData BaseNames[] = {
     {"zip://C%3a%5cmovies%5cmovie%5cmovie.zip/film.avi", false, "film"},
     {"zip://C%3a%5cmovies%5cmovie%5cfilm.zip/film.avi", true, "movie"},
     {"zip://C%3a%5cmovies%5cmovie%5cmovie.zip/movie/film.avi", false, "film"},
-    {"zip://C%3a%5cmovies%5cmovie%5cfilm.zip/movie/film.avi", true, "movie"},
+    {"zip://C%3a%5cmovies%5cmovie%5cfilm.zip/movie/film.avi", true, "movie", "movie"},
     {"zip://C%3a%5cmovies%5cmovies.zip/movie/BDMV/index.bdmv", false, "movie"},
-    {"zip://C%3a%5cmovies%5cmovies.zip/movie/BDMV/index.bdmv", true, "movie"},
+    {"zip://C%3a%5cmovies%5cmovies.zip/movie/BDMV/index.bdmv", true, "movie", "movies"},
     {"zip://C%3a%5cmovies%5cmovie%5cdisc%201%5cfilm.zip/BDMV/index.bdmv", false, "film"},
     {"zip://C%3a%5cmovies%5cmovie%5cdisc%201%5cfilm.zip/BDMV/index.bdmv", true, "movie"},
     //
@@ -733,9 +759,9 @@ const TestNameData BaseNames[] = {
     {"rar://C%3a%5cmovies%5cmovie%5cmovie.rar/film.avi", false, "film"},
     {"rar://C%3a%5cmovies%5cmovie%5cfilm.rar/film.avi", true, "movie"},
     {"rar://C%3a%5cmovies%5cmovie%5cmovie.rar/movie/film.avi", false, "film"},
-    {"rar://C%3a%5cmovies%5cmovie%5cfilm.rar/movie/film.avi", true, "movie"},
+    {"rar://C%3a%5cmovies%5cmovie%5cfilm.rar/movie/film.avi", true, "movie", "movie"},
     {"rar://C%3a%5cmovies%5cmovies.rar/movie/BDMV/index.bdmv", false, "movie"},
-    {"rar://C%3a%5cmovies%5cmovies.rar/movie/BDMV/index.bdmv", true, "movie"},
+    {"rar://C%3a%5cmovies%5cmovies.rar/movie/BDMV/index.bdmv", true, "movie", "movies"},
     {"rar://C%3a%5cmovies%5cmovie%5cdisc%201%5cfilm.rar/BDMV/index.bdmv", false, "film"},
     {"rar://C%3a%5cmovies%5cmovie%5cdisc%201%5cfilm.rar/BDMV/index.bdmv", true, "movie"},
     //
@@ -746,9 +772,9 @@ const TestNameData BaseNames[] = {
     {"archive://C%3a%5cmovies%5cmovie%5cmovie.tar.gz/film.avi", false, "film"},
     {"archive://C%3a%5cmovies%5cmovie%5cfilm.tar.gz/film.avi", true, "movie"},
     {"archive://C%3a%5cmovies%5cmovie%5cmovie.tar.gz/movie/film.avi", false, "film"},
-    {"archive://C%3a%5cmovies%5cmovie%5cfilm.tar.gz/movie/film.avi", true, "movie"},
+    {"archive://C%3a%5cmovies%5cmovie%5cfilm.tar.gz/movie/film.avi", true, "movie", "movie"},
     {"archive://C%3a%5cmovies%5cmovies.tar.gz/movie/BDMV/index.bdmv", false, "movie"},
-    {"archive://C%3a%5cmovies%5cmovies.tar.gz/movie/BDMV/index.bdmv", true, "movie"},
+    {"archive://C%3a%5cmovies%5cmovies.tar.gz/movie/BDMV/index.bdmv", true, "movie", "movies"},
     {"archive://C%3a%5cmovies%5cmovie%5cdisc%201%5cfilm.tar.gz/BDMV/index.bdmv", false, "film"},
     {"archive://C%3a%5cmovies%5cmovie%5cdisc%201%5cfilm.tar.gz/BDMV/index.bdmv", true, "movie"},
     // Embedded Windows server path tests
@@ -775,9 +801,9 @@ const TestNameData BaseNames[] = {
     {"zip://%5c%5cServer%5cMovies%5cmovie%5cmovie.zip/film.avi", false, "film"},
     {"zip://%5c%5cServer%5cMovies%5cmovie%5cfilm.zip/film.avi", true, "movie"},
     {"zip://%5c%5cServer%5cMovies%5cmovie%5cmovie.zip/movie/film.avi", false, "film"},
-    {"zip://%5c%5cServer%5cMovies%5cmovie%5cfilm.zip/movie/film.avi", true, "movie"},
+    {"zip://%5c%5cServer%5cMovies%5cmovie%5cfilm.zip/movie/film.avi", true, "movie", "movie"},
     {"zip://%5c%5cServer%5cMovies%5cmovies.zip/movie/BDMV/index.bdmv", false, "movie"},
-    {"zip://%5c%5cServer%5cMovies%5cmovies.zip/movie/BDMV/index.bdmv", true, "movie"},
+    {"zip://%5c%5cServer%5cMovies%5cmovies.zip/movie/BDMV/index.bdmv", true, "movie", "Movies"},
     {"zip://%5c%5cServer%5cMovies%5cmovie%5cdisc%201%5cfilm.zip/BDMV/index.bdmv", false, "film"},
     {"zip://%5c%5cServer%5cMovies%5cmovie%5cdisc%201%5cfilm.zip/BDMV/index.bdmv", true, "movie"},
     //
@@ -788,9 +814,9 @@ const TestNameData BaseNames[] = {
     {"rar://%5c%5cServer%5cMovies%5cmovie%5cmovie.rar/film.avi", false, "film"},
     {"rar://%5c%5cServer%5cMovies%5cmovie%5cfilm.rar/film.avi", true, "movie"},
     {"rar://%5c%5cServer%5cMovies%5cmovie%5cmovie.rar/movie/film.avi", false, "film"},
-    {"rar://%5c%5cServer%5cMovies%5cmovie%5cfilm.rar/movie/film.avi", true, "movie"},
+    {"rar://%5c%5cServer%5cMovies%5cmovie%5cfilm.rar/movie/film.avi", true, "movie", "movie"},
     {"rar://%5c%5cServer%5cMovies%5cmovies.rar/movie/BDMV/index.bdmv", false, "movie"},
-    {"rar://%5c%5cServer%5cMovies%5cmovies.rar/movie/BDMV/index.bdmv", true, "movie"},
+    {"rar://%5c%5cServer%5cMovies%5cmovies.rar/movie/BDMV/index.bdmv", true, "movie", "Movies"},
     {"rar://%5c%5cServer%5cMovies%5cmovie%5cdisc%201%5cfilm.rar/BDMV/index.bdmv", false, "film"},
     {"rar://%5c%5cServer%5cMovies%5cmovie%5cdisc%201%5cfilm.rar/BDMV/index.bdmv", true, "movie"},
     //
@@ -801,9 +827,11 @@ const TestNameData BaseNames[] = {
     {"archive://%5c%5cServer%5cMovies%5cmovie%5cmovie.tar.gz/film.avi", false, "film"},
     {"archive://%5c%5cServer%5cMovies%5cmovie%5cfilm.tar.gz/film.avi", true, "movie"},
     {"archive://%5c%5cServer%5cMovies%5cmovie%5cmovie.tar.gz/movie/film.avi", false, "film"},
-    {"archive://%5c%5cServer%5cMovies%5cmovie%5cfilm.tar.gz/movie/film.avi", true, "movie"},
+    {"archive://%5c%5cServer%5cMovies%5cmovie%5cfilm.tar.gz/movie/film.avi", true, "movie",
+     "movie"},
     {"archive://%5c%5cServer%5cMovies%5cmovies.tar.gz/movie/BDMV/index.bdmv", false, "movie"},
-    {"archive://%5c%5cServer%5cMovies%5cmovies.tar.gz/movie/BDMV/index.bdmv", true, "movie"},
+    {"archive://%5c%5cServer%5cMovies%5cmovies.tar.gz/movie/BDMV/index.bdmv", true, "movie",
+     "Movies"},
     {"archive://%5c%5cServer%5cMovies%5cmovie%5cdisc%201%5cfilm.tar.gz/BDMV/index.bdmv", false,
      "film"},
     {"archive://%5c%5cServer%5cMovies%5cmovie%5cdisc%201%5cfilm.tar.gz/BDMV/index.bdmv", true,
@@ -811,11 +839,24 @@ const TestNameData BaseNames[] = {
 
 TEST_P(TestFileItemMovieName, GetMovieName)
 {
+  const auto settings = CServiceBroker::GetSettingsComponent();
+  const bool old = settings->GetAdvancedSettings()->m_ignoreFolderNamesInArchives;
+  settings->GetAdvancedSettings()->m_ignoreFolderNamesInArchives = false;
+
   CFileItem item;
   item.SetPath(GetParam().file);
-  std::string path = CURL(item.GetMovieName(GetParam().use_folder)).Get();
-  std::string compare = CURL(GetParam().name).Get();
+  std::string path = item.GetMovieName(GetParam().use_folder);
+  std::string compare = GetParam().name;
   EXPECT_EQ(compare, path);
+
+  settings->GetAdvancedSettings()->m_ignoreFolderNamesInArchives = true;
+
+  item.SetPath(GetParam().file);
+  path = item.GetMovieName(GetParam().use_folder);
+  compare = GetParam().name2 ? GetParam().name2 : GetParam().name;
+  EXPECT_EQ(compare, path);
+
+  settings->GetAdvancedSettings()->m_ignoreFolderNamesInArchives = old;
 }
 
 INSTANTIATE_TEST_SUITE_P(NameMovies, TestFileItemMovieName, ValuesIn(BaseNames));
@@ -967,6 +1008,62 @@ TEST(TestFileItem, TestSimplePathSet)
   EXPECT_EQ("/local/path/dynamic/file.txt", item.GetDynURL().Get());
 }
 
+namespace
+{
+// A plugin item as it looks once playback has resolved it: the path is still the original
+// plugin url, and the dyn path is the thing actually being played.
+// See CPluginDirectory::GetPluginResult.
+CFileItem MakeResolvedPluginItem()
+{
+  CFileItem item;
+  item.SetPath("plugin://plugin.video.test/play/1");
+  item.SetDynPath("/resolved/real-stream.mkv");
+  return item;
+}
+
+// What an add-on hands to Player.updateInfoTag: the original url, and no dyn path of its own.
+CFileItem MakeAddonUpdateItem()
+{
+  CFileItem item;
+  item.SetPath("plugin://plugin.video.test/play/1");
+  return item;
+}
+} // namespace
+
+TEST(TestFileItem, UpdateInfoKeepsAResolvedDynPath)
+{
+  CFileItem target = MakeResolvedPluginItem();
+
+  CFileItem source = MakeAddonUpdateItem();
+  source.SetLabel("Updated title");
+
+  target.UpdateInfo(source);
+
+  EXPECT_EQ("Updated title", target.GetLabel());
+  EXPECT_EQ("/resolved/real-stream.mkv", target.GetDynPath());
+}
+
+TEST(TestFileItem, UpdateInfoTakesADynPathTheSourceActuallyHas)
+{
+  CFileItem target = MakeResolvedPluginItem();
+
+  CFileItem source = MakeAddonUpdateItem();
+  source.SetDynPath("/resolved/replacement.mkv");
+
+  target.UpdateInfo(source);
+
+  EXPECT_EQ("/resolved/replacement.mkv", target.GetDynPath());
+}
+
+TEST(TestFileItem, MergeInfoKeepsAResolvedDynPath)
+{
+  CFileItem target = MakeResolvedPluginItem();
+
+  target.MergeInfo(MakeAddonUpdateItem());
+
+  EXPECT_EQ("/resolved/real-stream.mkv", target.GetDynPath());
+}
+
 TEST(TestFileItem, TestLabel)
 {
   CFileItem item("My Item Label");
@@ -1100,3 +1197,36 @@ INSTANTIATE_TEST_SUITE_P(EpisodeLabel,
                          ValuesIn(EpisodeLabelCases),
                          [](const testing::TestParamInfo<EpisodeLabelTestCase>& info)
                          { return info.param.testName; });
+
+TEST(TestFileItemList, StackSkipsUnchangedFolders)
+{
+  std::error_code ec;
+  const std::string tempPath = KODI::PLATFORM::FILESYSTEM::create_temp_directory(ec);
+  EXPECT_FALSE(ec);
+  std::string moviePath = URIUtils::AddFileToFolder(tempPath, "movie");
+  EXPECT_TRUE(CUtil::CreateDirectoryEx(moviePath));
+  {
+    std::ofstream of(URIUtils::AddFileToFolder(moviePath, "VIDEO_TS.IFO"));
+  }
+  URIUtils::AddSlashAtEnd(moviePath);
+
+  {
+    // a disc structure folder is converted to a file item
+    // (the list needs a path or Stack() bails out as a virtual directory root)
+    CFileItemList items(tempPath);
+    items.Add(std::make_shared<CFileItem>(moviePath, true));
+    items.Stack();
+    EXPECT_FALSE(items[0]->IsFolder());
+  }
+  {
+    // unless it is marked unchanged by the library scanner
+    CFileItemList items(tempPath);
+    const auto folder = std::make_shared<CFileItem>(moviePath, true);
+    folder->SetProperty(PROPERTY_UNCHANGED, true);
+    items.Add(folder);
+    items.Stack();
+    EXPECT_TRUE(items[0]->IsFolder());
+  }
+
+  XFILE::CDirectory::RemoveRecursive(tempPath);
+}

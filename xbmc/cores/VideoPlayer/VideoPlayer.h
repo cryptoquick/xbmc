@@ -27,6 +27,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <unordered_map>
@@ -50,6 +51,7 @@ struct SPlayerState
     menuType = MenuType::NONE;
     chapter = 0;
     chapters.clear();
+    rawChapters.clear();
     m_bookmarks.clear();
     canpause = false;
     canseek = false;
@@ -78,9 +80,15 @@ struct SPlayerState
   MenuType menuType;
   bool streamsReady;
 
-  int chapter; // 1-based current chapter. <=0 means no chapter / unknown
-  // name and start timestamp of chapters.
+  // 1-based current chapter, numbered among the chapters visible to the user (i.e. excluding
+  // chapters fully hidden by an EDL cut). <=0 means no chapter / unknown
+  int chapter;
+  // name and start timestamp of chapters visible to the user (chapters fully contained within
+  // an EDL cut are omitted).
   std::vector<std::pair<std::string, std::chrono::milliseconds>> chapters;
+  // for each entry in `chapters`, the corresponding 1-based chapter index reported by the
+  // demuxer/inputstream, used to translate a visible chapter number back to a seekable one.
+  std::vector<int> rawChapters;
   // position of the bookmarks
   std::vector<std::chrono::milliseconds> m_bookmarks;
 
@@ -373,11 +381,6 @@ public:
   bool Supports(ESCALINGMETHOD method) const override;
   bool Supports(ERENDERFEATURE feature) const override;
 
-  unsigned int RenderCaptureAlloc() override;
-  void RenderCapture(unsigned int captureId, unsigned int width, unsigned int height, int flags) override;
-  void RenderCaptureRelease(unsigned int captureId) override;
-  bool RenderCaptureGetPixels(unsigned int captureId, unsigned int millis, uint8_t *buffer, unsigned int size) override;
-
   // IDispResource interface
   void OnLostDisplay() override;
   void OnResetDisplay() override;
@@ -499,11 +502,12 @@ protected:
   bool OpenDemuxStream();
   void CloseDemuxer();
   void OpenDefaultStreams(bool reset = true);
+  void UpdateHasVideoAudio();
 
   void UpdatePlayState(double timeout);
   void GetGeneralInfo(std::string& strVideoInfo);
   int64_t GetUpdatedTime();
-  int64_t GetTime();
+  int64_t GetTime() const;
   float GetPercentage();
 
   virtual bool CanTempo();
@@ -514,9 +518,36 @@ protected:
   void UpdateFileItemStreamDetails(CFileItem& item, UpdateStreamDetails update);
   int GetPreviousChapter();
   std::optional<std::chrono::milliseconds> GetChapterPosMs(int chapterIdx = -1) const;
+  // Translate a 1-based visible chapter number (as seen by GetChapter()/GetChapterCount())
+  // to the 1-based chapter index expected by the demuxer/inputstream. Falls back to
+  // returning visibleChapter unchanged if no mapping is available yet.
+  int ToRawChapter(int visibleChapter) const;
   int GetPreviousBookmark(std::chrono::milliseconds ts);
   int GetNextBookmark(std::chrono::milliseconds ts);
   std::optional<std::chrono::milliseconds> GetBookmarkPos(int idx);
+
+  struct SeekCandidate
+  {
+    int64_t targetTime;
+    std::function<void()> action;
+  };
+
+  enum class SeekStep
+  {
+    NORMAL,
+    LARGE,
+  };
+
+  static int64_t CalcTimeOrPercentSeekTarget(int64_t time,
+                                             int64_t maxTime,
+                                             Direction direction,
+                                             SeekStep step);
+  std::optional<SeekCandidate> GetTimeOrPercentSeekCandidate(int64_t time,
+                                                             Direction direction,
+                                                             SeekStep step);
+  std::optional<SeekCandidate> GetChapterSeekCandidate(int64_t time, Direction direction);
+  std::optional<SeekCandidate> GetBookmarkSeekCandidate(int64_t time, Direction direction);
+  void ExecuteTimeSeek(int64_t target, Direction direction, bool accurate);
 
   bool m_players_created;
 

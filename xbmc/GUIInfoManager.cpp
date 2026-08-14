@@ -1606,7 +1606,7 @@ constexpr std::array<InfoMap, 10> weather = {{
 ///     <p>
 ///   }
 ///   \table_row3{   <b>`System.Time(startTime[\,endTime])`</b>,
-///                  \anchor System_Time
+///                  \anchor System_Time_startTime_endTime
 ///                  _boolean_,
 ///     @return **True** if the current system time is >= `startTime` and < `endTime` (if defined).
 ///     @param startTime - Start time
@@ -1645,7 +1645,7 @@ constexpr std::array<InfoMap, 10> weather = {{
 ///     <p>
 ///   }
 ///   \table_row3{   <b>`System.Date(startDate[\,endDate])`</b>,
-///                  \anchor System_Date
+///                  \anchor System_Date_startDate_endDate
 ///                  _boolean_,
 ///     @return **True** if the current system date is >= `startDate` and < `endDate` (if defined).
 ///     @param startDate - The start date
@@ -1972,7 +1972,7 @@ constexpr std::array<InfoMap, 10> weather = {{
 ///     `System.AddonVersion(id)`\endlink <p>
 ///   }
 ///   \table_row3{   <b>`System.AddonIcon(id)`</b>,
-///                  \anchor System_AddonVersion
+///                  \anchor System_AddonIcon
 ///                  _string_,
 ///     @return The icon of the addon with the given id.
 ///     @param id - the addon id
@@ -2356,12 +2356,6 @@ constexpr std::array<InfoMap, 7> musicpartymode = {{
 ///     @return The album from which the song with offset `number` with respect to
 ///     the start of the playlist is from.
 ///     @param number - the offset number with respect to the start of the playlist
-///     <p>
-///   }
-///   \table_row3{   <b>`MusicPlayer.Property(Album_Mood)`</b>,
-///                  \anchor MusicPlayer_Property_Album_Mood
-///                  _string_,
-///     @return The moods of the currently playing Album
 ///     <p>
 ///   }
 ///   \table_row3{   <b>`MusicPlayer.Property(Role.Composer)`</b>,
@@ -3963,6 +3957,14 @@ constexpr std::array<InfoMap, 46> musicplayer = {{
 ///     see \ref ListItem_VideoAspect "ListItem.VideoAspect").
 ///     <p>
 ///   }
+///   \table_row3{   <b>`VideoPlayer.VideoBitrate`</b>,
+///                  \anchor VideoPlayer_VideoBitrate
+///                  _string_,
+///     @return The bitrate of the video stream of the currently playing video\, in kbps.
+///     <p><hr>
+///     @skinning_v18 **[New Infolabel]** \link VideoPlayer_VideoBitrate `VideoPlayer.VideoBitrate`\endlink
+///     <p>
+///   }
 ///   \table_row3{   <b>`VideoPlayer.AudioCodec`</b>,
 ///                  \anchor VideoPlayer_AudioCodec
 ///                  _string_,
@@ -3985,6 +3987,14 @@ constexpr std::array<InfoMap, 46> musicplayer = {{
 ///
 ///     @skinning_v22 **[Infolabel Updated]** \link VideoPlayer_AudioChannels `VideoPlayer.AudioChannels`\endlink
 ///     added optional format parameter
+///     <p>
+///   }
+///   \table_row3{   <b>`VideoPlayer.AudioBitrate`</b>,
+///                  \anchor VideoPlayer_AudioBitrate
+///                  _string_,
+///     @return The bitrate of the audio stream of the currently playing video\, in kbps.
+///     <p><hr>
+///     @skinning_v18 **[New Infolabel]** \link VideoPlayer_AudioBitrate `VideoPlayer.AudioBitrate`\endlink
 ///     <p>
 ///   }
 ///   \table_row3{   <b>`VideoPlayer.AudioLanguage`</b>,
@@ -4410,81 +4420,6 @@ constexpr std::array<InfoMap, 88> videoplayer = {{
 /// \subsection modules__infolabels_boolean_conditions_RetroPlayer RetroPlayer
 /// \table_start
 ///   \table_h3{ Labels, Type, Description }
-///   \table_row3{   <b>`RetroPlayer.VideoFilter`</b>,
-///                  \anchor RetroPlayer_VideoFilter
-///                  _string_,
-///     @return The video filter of the currently-playing game.
-///     The following values are possible:
-///       - <b>`nearest`</b> (Nearest neighbor\, i.e. pixelate)
-///       - <b>`linear`</b> (Bilinear filtering\, i.e. smooth blur)
-///     <p><hr>
-///     @skinning_v18 **[New Infolabel]** \link RetroPlayer_VideoFilter `RetroPlayer.VideoFilter`\endlink
-///     <p>
-///   }
-///   \table_row3{   <b>`RetroPlayer.StretchMode`</b>,
-///                  \anchor RetroPlayer_StretchMode
-///                  _string_,
-///     @return The stretch mode of the currently-playing game.
-///     The following values are possible:
-///       - <b>`normal`</b> (Show the game normally)
-///       - <b>`4:3`</b> (Stretch to a 4:3 aspect ratio)
-///       - <b>`fullscreen`</b> (Stretch to the full viewing area)
-///       - <b>`original`</b> (Shrink to the original resolution)
-///     <p><hr>
-///     @skinning_v18 **[New Infolabel]** \link RetroPlayer_StretchMode `RetroPlayer.StretchMode`\endlink
-///     <p>
-///   }
-///   \table_row3{   <b>`RetroPlayer.VideoRotation`</b>,
-///                  \anchor RetroPlayer_VideoRotation
-///                  _integer_,
-///     @return The video rotation of the currently-playing game
-///     in degrees counter-clockwise.
-///     The following values are possible:
-///       - <b>`0`</b>
-///       - <b>`90`</b> (Shown in the GUI as 270 degrees)
-///       - <b>`180`</b>
-///       - <b>`270`</b> (Shown in the GUI as 90 degrees)
-///     <p><hr>
-///     @skinning_v18 **[New Infolabel]** \link RetroPlayer_VideoRotation `RetroPlayer.VideoRotation`\endlink
-///     <p>
-///   }
-///   \table_row3{   <b>`RetroPlayer.SupportsEject`</b>,
-///                  \anchor RetroPlayer_SupportsEject
-///                  _boolean_,
-///     @return **True** if the game's disc can be ejected\, **False** if the
-///     game isn't disc-based or doesn't support ejecting the disc.
-///     <p><hr>
-///     @skinning_v22 **[New Boolean Condition]** \link RetroPlayer_SupportsEject `RetroPlayer.SupportsEject`\endlink
-///     <p>
-///   }
-///   \table_row3{   <b>`RetroPlayer.DiscEjected`</b>,
-///                  \anchor RetroPlayer_DiscEjected
-///                  _boolean_,
-///     @return **True** if the game's disc is ejected (tray is open)\, **False**
-///     if the game isn't disc-based or the tray is closed.
-///     <p><hr>
-///     @skinning_v22 **[New Boolean Condition]** \link RetroPlayer_DiscEjected `RetroPlayer.DiscEjected`\endlink
-///     <p>
-///   }
-///   \table_row3{   <b>`RetroPlayer.DiscLabel`</b>,
-///                  \anchor RetroPlayer_DiscLabel
-///                  _string_,
-///     @return The human-readable label of the currently inserted disc\, or
-///     an empty string if no disc is in the tray/floppy drive or the game
-///     isn't disc-based.
-///     <p><hr>
-///     @skinning_v22 **[New Infolabel]** \link RetroPlayer_DiscLabel `RetroPlayer.DiscLabel`\endlink
-///     <p>
-///   }
-///   \table_row3{   <b>`RetroPlayer.EmptyTray`</b>,
-///                  \anchor RetroPlayer_EmptyTray
-///                  _boolean_,
-///     @return **True** if the selected disc state is "No disc"\, **False** if a
-///     disc is selected or the game isn't disc-based.
-///     <p><hr>
-///     @skinning_v22 **[New Boolean Condition]** \link RetroPlayer_EmptyTray `RetroPlayer.EmptyTray`\endlink
-///     <p>
-///   }
 ///   \table_row3{   <b>`RetroPlayer.Title`</b>,
 ///                  \anchor RetroPlayer_Title
 ///                  _string_,
@@ -4561,14 +4496,103 @@ constexpr std::array<InfoMap, 88> videoplayer = {{
 ///     @skinning_v22 **[New Infolabel]** \link RetroPlayer_GameClientPlatforms `RetroPlayer.GameClientPlatforms`\endlink
 ///     <p>
 ///   }
+///   \table_row3{   <b>`RetroPlayer.AchievementsLoggedIn`</b>,
+///                  \anchor RetroPlayer_AchievementsLoggedIn
+///                  _boolean_,
+///     @return **True** if logged in to RetroAchievements\, **False** otherwise.
+///     <p><hr>
+///     @skinning_v22 **[New Boolean Condition]** \link RetroPlayer_AchievementsLoggedIn `RetroPlayer.AchievementsLoggedIn`\endlink
+///     <p>
+///   }
+///   \table_row3{   <b>`RetroPlayer.RichPresence`</b>,
+///                  \anchor RetroPlayer_RichPresence
+///                  _string_,
+///     @return The RetroAchievements rich presence status for the currently-playing
+///     game\, or an empty string if no rich presence status is available.
+///     <p><hr>
+///     @skinning_v22 **[New Infolabel]** \link RetroPlayer_RichPresence `RetroPlayer.RichPresence`\endlink
+///     <p>
+///   }
+///   \table_row3{   <b>`RetroPlayer.SupportsEject`</b>,
+///                  \anchor RetroPlayer_SupportsEject
+///                  _boolean_,
+///     @return **True** if the game's disc can be ejected\, **False** if the
+///     game isn't disc-based or doesn't support ejecting the disc.
+///     <p><hr>
+///     @skinning_v22 **[New Boolean Condition]** \link RetroPlayer_SupportsEject `RetroPlayer.SupportsEject`\endlink
+///     <p>
+///   }
+///   \table_row3{   <b>`RetroPlayer.DiscEjected`</b>,
+///                  \anchor RetroPlayer_DiscEjected
+///                  _boolean_,
+///     @return **True** if the game's disc is ejected (tray is open)\, **False**
+///     if the game isn't disc-based or the tray is closed.
+///     <p><hr>
+///     @skinning_v22 **[New Boolean Condition]** \link RetroPlayer_DiscEjected `RetroPlayer.DiscEjected`\endlink
+///     <p>
+///   }
+///   \table_row3{   <b>`RetroPlayer.DiscLabel`</b>,
+///                  \anchor RetroPlayer_DiscLabel
+///                  _string_,
+///     @return The human-readable label of the currently inserted disc\, or
+///     an empty string if no disc is in the tray/floppy drive or the game
+///     isn't disc-based.
+///     <p><hr>
+///     @skinning_v22 **[New Infolabel]** \link RetroPlayer_DiscLabel `RetroPlayer.DiscLabel`\endlink
+///     <p>
+///   }
+///   \table_row3{   <b>`RetroPlayer.EmptyTray`</b>,
+///                  \anchor RetroPlayer_EmptyTray
+///                  _boolean_,
+///     @return **True** if the selected disc state is "No disc"\, **False** if a
+///     disc is selected or the game isn't disc-based.
+///     <p><hr>
+///     @skinning_v22 **[New Boolean Condition]** \link RetroPlayer_EmptyTray `RetroPlayer.EmptyTray`\endlink
+///     <p>
+///   }
+///   \table_row3{   <b>`RetroPlayer.VideoFilter`</b>,
+///                  \anchor RetroPlayer_VideoFilter
+///                  _string_,
+///     @return The video filter of the currently-playing game.
+///     The following values are possible:
+///       - <b>`nearest`</b> (Nearest neighbor\, i.e. pixelate)
+///       - <b>`linear`</b> (Bilinear filtering\, i.e. smooth blur)
+///     <p><hr>
+///     @skinning_v18 **[New Infolabel]** \link RetroPlayer_VideoFilter `RetroPlayer.VideoFilter`\endlink
+///     <p>
+///   }
+///   \table_row3{   <b>`RetroPlayer.StretchMode`</b>,
+///                  \anchor RetroPlayer_StretchMode
+///                  _string_,
+///     @return The stretch mode of the currently-playing game.
+///     The following values are possible:
+///       - <b>`normal`</b> (Show the game normally)
+///       - <b>`4:3`</b> (Stretch to a 4:3 aspect ratio)
+///       - <b>`fullscreen`</b> (Stretch to the full viewing area)
+///       - <b>`original`</b> (Shrink to the original resolution)
+///     <p><hr>
+///     @skinning_v18 **[New Infolabel]** \link RetroPlayer_StretchMode `RetroPlayer.StretchMode`\endlink
+///     <p>
+///   }
+///   \table_row3{   <b>`RetroPlayer.VideoRotation`</b>,
+///                  \anchor RetroPlayer_VideoRotation
+///                  _integer_,
+///     @return The video rotation of the currently-playing game
+///     in degrees counter-clockwise.
+///     The following values are possible:
+///       - <b>`0`</b>
+///       - <b>`90`</b> (Shown in the GUI as 270 degrees)
+///       - <b>`180`</b>
+///       - <b>`270`</b> (Shown in the GUI as 90 degrees)
+///     <p><hr>
+///     @skinning_v18 **[New Infolabel]** \link RetroPlayer_VideoRotation `RetroPlayer.VideoRotation`\endlink
+///     <p>
+///   }
 /// \table_end
 ///
 /// -----------------------------------------------------------------------------
 // clang-format off
-constexpr std::array<InfoMap, 16> retroplayer = {{
-    {"videofilter",   RETROPLAYER_VIDEO_FILTER},
-    {"stretchmode",   RETROPLAYER_STRETCH_MODE},
-    {"videorotation", RETROPLAYER_VIDEO_ROTATION},
+constexpr std::array<InfoMap, 18> retroplayer = {{
     {"title", RETROPLAYER_TITLE},
     {"platform", RETROPLAYER_PLATFORM},
     {"genres", RETROPLAYER_GENRES},
@@ -4578,10 +4602,15 @@ constexpr std::array<InfoMap, 16> retroplayer = {{
     {"gameclient", RETROPLAYER_GAME_CLIENT},
     {"gameclientname", RETROPLAYER_GAME_CLIENT_NAME},
     {"gameclientplatforms", RETROPLAYER_GAME_CLIENT_PLATFORMS},
+    {"richpresence", RETROPLAYER_RICH_PRESENCE},
+    {"achievementsloggedin", RETROPLAYER_ACHIEVEMENTS_LOGGED_IN},
     {"supportseject", RETROPLAYER_SUPPORTS_EJECT},
     {"discejected", RETROPLAYER_DISC_EJECTED},
     {"disclabel", RETROPLAYER_DISC_LABEL},
     {"emptytray", RETROPLAYER_EMPTY_TRAY},
+    {"videofilter", RETROPLAYER_VIDEO_FILTER},
+    {"stretchmode", RETROPLAYER_STRETCH_MODE},
+    {"videorotation", RETROPLAYER_VIDEO_ROTATION},
 }};
 // clang-format on
 
@@ -5217,6 +5246,20 @@ constexpr std::array<InfoMap, 3> container_str = {{
 ///     @return **True** if the current Season/Episode is a Special.
 ///     <p>
 ///   }
+///   \table_row3{   <b>`ListItem.Property(isbookmark)`</b>,
+///                  \anchor ListItem_Property_IsBookmark
+///                  _boolean_,
+///     @return **True** if the item is a bookmark.
+///     @note Only set on items in the video bookmarks dialog.
+///     <p>
+///   }
+///   \table_row3{   <b>`ListItem.Property(ischapter)`</b>,
+///                  \anchor ListItem_Property_IsChapter
+///                  _boolean_,
+///     @return **True** if the item is a chapter.
+///     @note Only set on items in the video bookmarks dialog.
+///     <p>
+///   }
 ///   \table_row3{   <b>`ListItem.Property(DateLabel)`</b>,
 ///                  \anchor ListItem_Property_DateLabel
 ///                  _boolean_,
@@ -5493,7 +5536,7 @@ constexpr std::array<InfoMap, 3> container_str = {{
 ///                  _string_,
 ///     @return The total number of discs belonging to an album.
 ///     <p><hr>
-///     @skinning_v19 **[New Infolabel]** \link ListItem.Property(Album_Totaldiscs) `ListItem.Property(Album_Totaldiscs)`\endlink
+///     @skinning_v19 **[New Infolabel]** \link ListItem_Property_Album_Totaldiscs `ListItem.Property(Album_Totaldiscs)`\endlink
 ///     <p>
 ///   }
 ///   \table_row3{   <b>`ListItem.Property(Album_Isboxset)`</b>,
@@ -5501,7 +5544,7 @@ constexpr std::array<InfoMap, 3> container_str = {{
 ///                  _string_,
 ///     @return **True** if the album is a boxset.
 ///     <p><hr>
-///     @skinning_v19 **[New Infobool]** \link ListItem.Property(Album_Isboxset) `ListItem.Property(Album_Isboxset)`\endlink
+///     @skinning_v19 **[New Infobool]** \link ListItem_Property_Album_Isboxset `ListItem.Property(Album_Isboxset)`\endlink
 ///     <p>
 ///   }
 ///   \table_row3{   <b>`ListItem.Property(Album_Duration)`</b>,
@@ -6635,9 +6678,12 @@ constexpr std::array<InfoMap, 3> container_str = {{
 ///      - <b>1.19</b>
 ///      - <b>1.33</b>
 ///      - <b>1.37</b>
+///      - <b>1.43</b>
+///      - <b>1.50</b>
 ///      - <b>1.66</b>
 ///      - <b>1.78</b>
 ///      - <b>1.85</b>
+///      - <b>1.90</b>
 ///      - <b>2.00</b>
 ///      - <b>2.20</b>
 ///      - <b>2.35</b>
@@ -6969,7 +7015,7 @@ constexpr std::array<InfoMap, 3> container_str = {{
 ///     <p>
 ///   }
 ///   \table_row3{   <b>`ListItem.HasReminderRule`</b>,
-///                  \anchor ListItem_ListItem.HasReminderRule
+///                  \anchor ListItem_HasReminderRule
 ///                  _boolean_,
 ///     @return **True** if the item was scheduled by a reminder timer rule (PVR).
 ///     <p><hr>
@@ -7558,7 +7604,7 @@ constexpr std::array<InfoMap, 3> container_str = {{
 ///     @return The number of audio channels of a song.
 ///     (possible values: see \ref ListItem_AudioChannels "ListItem.AudioChannels").
 ///     <p><hr>
-///     @skinning_v19 **[New Infolabel]** \link ListItem_No_Of_Channels `ListItem.NoOfChannels`\endlink
+///     @skinning_v19 **[New Infolabel]** \link ListItem_MusicChannels `ListItem.MusicChannels`\endlink
 ///
 ///     @skinning_v22 **[Infolabel Updated]** \link ListItem_MusicChannels `ListItem.MusicChannels`\endlink
 ///     added optional format parameter
@@ -8045,7 +8091,7 @@ constexpr std::array<InfoMap, 4> fanart_labels = {{
 ///                  _boolean_,
 ///     @param setting - the requested skin setting
 ///     @return **True** if the requested skin setting is true\, false otherwise.
-///     @sa \link Skin_SetBool `Skin.SetBool(setting[\,value])`
+///     @sa \link Skin_SetBool `Skin.SetBool(setting[\,value])`\endlink
 ///     <p>
 ///   }
 ///   \table_row3{   <b>`Skin.String(setting)`</b>,
@@ -8300,6 +8346,16 @@ constexpr std::array<InfoMap, 9> window_bools = {{
 /// \subsection modules__infolabels_boolean_conditions_Control Control
 /// \table_start
 ///   \table_h3{ Labels, Type, Description }
+///   \table_row3{   <b>`ControlGroup(id).HasFocus(controlid)`</b>,
+///                  \anchor ControlGroup_HasFocus
+///                  _boolean_,
+///     @return **True** if the group with id "id" has focus. If "controlid" is
+///     given\, **True** if that control is the one currently selected in the
+///     group instead.
+///     @param id - The id of the group
+///     @param controlid - The id of a control in the group (optional)
+///     <p>
+///   }
 ///   \table_row3{   <b>`Control.HasFocus(id)`</b>,
 ///                  \anchor Control_HasFocus
 ///                  _boolean_,
@@ -9948,7 +10004,7 @@ constexpr std::array<InfoMap, 45> rds = {{
 ///       - <b>"Colour"</b>
 ///       - <b>"Black and White"</b>
 ///     <p>
-///     @deprecated Slideshow_Colour `Slideshow.Colour`\endlink is deprecated and will be removed in future Kodi versions
+///     @deprecated \link Slideshow_Colour `Slideshow.Colour`\endlink is deprecated and will be removed in future Kodi versions
 ///     <p><hr>
 ///     @skinning_v13 **[New Infolabel]** \link Slideshow_Colour `Slideshow.Colour`\endlink
 ///     <p>
@@ -10584,11 +10640,11 @@ constexpr std::array<InfoMap, 63> slideshow = {{
 ///     <p>
 ///   }
 ///   \table_row3{   <b>`Library.HasContent(Role.Arranger)`</b>,
-///                  \anchor Library_HasContent_Role_Remixer
+///                  \anchor Library_HasContent_Role_Arranger
 ///                  _boolean_,
 ///     @return **True** if there are songs in the library which have an arranger.
 ///     <p><hr>
-///     @skinning_v17 **[New Boolean Condition]** \link Library_HasContent_Role_Remixer `Library.HasContent(Role.Arranger)`\endlink
+///     @skinning_v17 **[New Boolean Condition]** \link Library_HasContent_Role_Arranger `Library.HasContent(Role.Arranger)`\endlink
 ///     <p>
 ///   }
 ///   \table_row3{   <b>`Library.HasContent(Role.Engineer)`</b>,
@@ -10665,7 +10721,7 @@ constexpr std::array<InfoMap, 63> slideshow = {{
 /// <hr>
 /// \subsection modules_rm_infolabels_booleans_v19 Kodi v19 (Matrix)
 /// @skinning_v19 **[Removed Infolabels]** The following infolabels have been removed:
-///   - `System.Platform.Linux.RaspberryPi` - use \link System_Platform_Linux `System.Platform.Linux`\endlink instead
+///   - `System.Platform.Linux.RaspberryPi` - use \link System_PlatformLinux `System.Platform.Linux`\endlink instead
 ///
 /// <hr>
 /// \subsection modules_rm_infolabels_booleans_v18 Kodi v18 (Leia)

@@ -921,7 +921,7 @@ bool CDVDVideoCodecAndroidMediaCodec::Open(CDVDStreamInfo &hints, CDVDCodecOptio
 
   if (m_codecname.starts_with("OMX.Nvidia"))
     m_invalidPTSValue = AV_NOPTS_VALUE;
-  else if (m_codecname.starts_with("OMX.MTK"))
+  else if (m_codecname.starts_with("OMX.MTK") || m_codecname.starts_with("c2.mtk"))
     m_invalidPTSValue = -1; //Use DTS
   else
     m_invalidPTSValue = 0;
@@ -1300,7 +1300,8 @@ CDVDVideoCodec::VCReturn CDVDVideoCodecAndroidMediaCodec::GetPicture(VideoPictur
     // try to fetch an input buffer
     if (m_indexInputBuffer < 0)
     {
-      m_indexInputBuffer = m_codec->dequeueInputBuffer(5000 /*timeout*/);
+      m_indexInputBuffer =
+          m_codec->dequeueInputBuffer((m_codecControlFlags & DVD_CODEC_CTRL_DROP) ? 0 : 5000);
       if (xbmc_jnienv()->ExceptionCheck())
       {
         xbmc_jnienv()->ExceptionDescribe();
@@ -1617,6 +1618,10 @@ int CDVDVideoCodecAndroidMediaCodec::GetOutputPicture(void)
 {
   int rtn = 0;
   int64_t timeout_us = (m_state == MEDIACODEC_STATE_WAIT_ENDOFSTREAM) ? 100000 : 10000;
+
+  if (m_codecControlFlags & DVD_CODEC_CTRL_DROP)
+    timeout_us = 0;
+
   CJNIMediaCodecBufferInfo bufferInfo;
 
   ssize_t index = m_codec->dequeueOutputBuffer(bufferInfo, timeout_us);

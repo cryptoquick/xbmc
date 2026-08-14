@@ -111,6 +111,11 @@ namespace PythonBindings
   //=========================================================================
 
   //=========================================================================
+  // These variables will hold the Python Type information for XBMCAddon::xbmcgui::ControlVideoWindow
+  TypeInfo TyXBMCAddon_xbmcgui_ControlVideoWindow_Type(typeid(XBMCAddon::xbmcgui::ControlVideoWindow));
+  //=========================================================================
+
+  //=========================================================================
   // These variables will hold the Python Type information for XBMCAddon::xbmcgui::ControlRadioButton
   TypeInfo TyXBMCAddon_xbmcgui_ControlRadioButton_Type(typeid(XBMCAddon::xbmcgui::ControlRadioButton));
   //=========================================================================
@@ -6901,6 +6906,70 @@ namespace PythonBindings
     return result; 
   } 
 
+  static PyObject* xbmcgui_XBMCAddon_xbmcgui_ControlVideoWindow_New (PyTypeObject* pytype  , PyObject *args, PyObject *kwds  )
+  {
+    XBMC_TRACE;
+
+    static const char *keywords[] = {
+          "x",
+          "y",
+          "width",
+          "height",
+          NULL};
+
+    long  x ;
+    long  y ;
+    long  width ;
+    long  height ;
+    if (!PyArg_ParseTupleAndKeywords(
+       args,
+       kwds,
+       "llll",
+       const_cast<char**>(keywords),
+         &x,
+         &y,
+         &width,
+         &height
+       ))
+    {
+      return NULL;
+    }
+
+    XBMCAddon::xbmcgui::ControlVideoWindow * apiResult;
+    try
+    {
+
+      XBMCAddon::SetLanguageHookGuard slhg(XBMCAddon::Python::PythonLanguageHook::GetIfExists(PyThreadState_Get()->interp).get());
+      apiResult = new XBMCAddon::xbmcgui::ControlVideoWindow(  x,  y,  width,  height  );
+      prepareForReturn(apiResult);
+    }
+    catch (const XBMCAddon::WrongTypeException& e)
+    {
+      CLog::Log(LOGERROR,"EXCEPTION: {}",e.GetExMessage());
+      PyErr_SetString(PyExc_TypeError, e.GetExMessage()); 
+      return NULL; 
+    }
+    catch (const XbmcCommons::Exception& e)
+    {
+      CLog::Log(LOGERROR,"EXCEPTION: {}",e.GetExMessage());
+      PyErr_SetString(PyExc_RuntimeError, e.GetExMessage()); 
+      return NULL; 
+    }
+    catch (...)
+    {
+      CLog::Log(LOGERROR,"EXCEPTION: Unknown exception thrown from the call \"new XBMCAddon::xbmcgui::ControlVideoWindow\"");
+      PyErr_SetString(PyExc_RuntimeError, "Unknown exception thrown from the call \"new XBMCAddon::xbmcgui::ControlVideoWindow\""); 
+      return NULL; 
+    }
+
+    PyObject* result = Py_None;
+
+    // transform the result
+    result = makePythonInstance(apiResult,pytype,false);
+
+    return result; 
+  } 
+
   static PyObject* xbmcgui_XBMCAddon_xbmcgui_ControlRadioButton_New (PyTypeObject* pytype  , PyObject *args, PyObject *kwds  )
   {
     XBMC_TRACE;
@@ -12052,6 +12121,37 @@ namespace PythonBindings
     (((PyObject*)(self))->ob_type)->tp_free((PyObject*)self);
     
   } 
+  static void xbmcgui_XBMCAddon_xbmcgui_ControlVideoWindow_Dealloc (PyHolder* self  )
+  {
+    XBMC_TRACE;
+
+    try
+    {
+
+
+      XBMCAddon::xbmcgui::ControlVideoWindow* theObj = (XBMCAddon::xbmcgui::ControlVideoWindow*)retrieveApiInstance((PyObject*)self,&TyXBMCAddon_xbmcgui_ControlVideoWindow_Type,"~XBMCAddon::xbmcgui::ControlVideoWindow","XBMCAddon::xbmcgui::ControlVideoWindow");
+      cleanForDealloc(theObj);
+
+    }
+    catch (const XBMCAddon::WrongTypeException& e)
+    {
+      CLog::Log(LOGERROR,"EXCEPTION: {}",e.GetExMessage());
+      PyErr_SetString(PyExc_TypeError, e.GetExMessage()); 
+    }
+    catch (const XbmcCommons::Exception& e)
+    {
+      CLog::Log(LOGERROR,"EXCEPTION: {}",e.GetExMessage());
+      PyErr_SetString(PyExc_RuntimeError, e.GetExMessage()); 
+    }
+    catch (...)
+    {
+      CLog::Log(LOGERROR,"EXCEPTION: Unknown exception thrown from the call \"XBMCAddon::xbmcgui::ControlVideoWindow\"");
+      PyErr_SetString(PyExc_RuntimeError, "Unknown exception thrown from the call \"XBMCAddon::xbmcgui::ControlVideoWindow\""); 
+    }
+
+    (((PyObject*)(self))->ob_type)->tp_free((PyObject*)self);
+    
+  } 
   static void xbmcgui_XBMCAddon_xbmcgui_ControlRadioButton_Dealloc (PyHolder* self  )
   {
     XBMC_TRACE;
@@ -12910,6 +13010,44 @@ namespace PythonBindings
 
   //=========================================================================
   // This section contains the initialization for the
+  // Python extension for the Api class XBMCAddon::xbmcgui::ControlVideoWindow
+  //=========================================================================
+  // All of the methods on this class
+  static PyMethodDef XBMCAddon_xbmcgui_ControlVideoWindow_methods[] = { 
+    {NULL, NULL, 0, NULL}
+  };
+
+
+
+  // This method initializes the above mentioned Python Type structure
+  static void initPyXBMCAddon_xbmcgui_ControlVideoWindow_Type()
+  {
+
+
+    PyTypeObject& pythonType = TyXBMCAddon_xbmcgui_ControlVideoWindow_Type.pythonType;
+    pythonType.tp_name = "xbmcgui.ControlVideoWindow";
+    pythonType.tp_basicsize = sizeof(PyHolder);
+    pythonType.tp_dealloc = (destructor)xbmcgui_XBMCAddon_xbmcgui_ControlVideoWindow_Dealloc; 
+
+    pythonType.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
+
+    pythonType.tp_doc = NULL;
+    pythonType.tp_methods = XBMCAddon_xbmcgui_ControlVideoWindow_methods; 
+
+    pythonType.tp_base = &(TyXBMCAddon_xbmcgui_Control_Type.pythonType);
+    pythonType.tp_new = xbmcgui_XBMCAddon_xbmcgui_ControlVideoWindow_New;
+    pythonType.tp_init = dummy_tp_init;
+
+    TyXBMCAddon_xbmcgui_ControlVideoWindow_Type.swigType="p.XBMCAddon::xbmcgui::ControlVideoWindow";
+    TyXBMCAddon_xbmcgui_ControlVideoWindow_Type.parentType=&TyXBMCAddon_xbmcgui_Control_Type;
+
+    registerAddonClassTypeInformation(&TyXBMCAddon_xbmcgui_ControlVideoWindow_Type);
+
+  }
+  //=========================================================================
+
+  //=========================================================================
+  // This section contains the initialization for the
   // Python extension for the Api class XBMCAddon::xbmcgui::ControlRadioButton
   //=========================================================================
   // All of the methods on this class
@@ -13416,6 +13554,7 @@ namespace PythonBindings
       initPyXBMCAddon_xbmcgui_ControlProgress_Type();
       initPyXBMCAddon_xbmcgui_ControlButton_Type();
       initPyXBMCAddon_xbmcgui_ControlGroup_Type();
+      initPyXBMCAddon_xbmcgui_ControlVideoWindow_Type();
       initPyXBMCAddon_xbmcgui_ControlRadioButton_Type();
       initPyXBMCAddon_xbmcgui_ControlSlider_Type();
       initPyXBMCAddon_xbmcgui_Dialog_Type();
@@ -13449,6 +13588,8 @@ namespace PythonBindings
       if (PyType_Ready(&(TyXBMCAddon_xbmcgui_ControlButton_Type.pythonType)) < 0)
         return;
       if (PyType_Ready(&(TyXBMCAddon_xbmcgui_ControlGroup_Type.pythonType)) < 0)
+        return;
+      if (PyType_Ready(&(TyXBMCAddon_xbmcgui_ControlVideoWindow_Type.pythonType)) < 0)
         return;
       if (PyType_Ready(&(TyXBMCAddon_xbmcgui_ControlRadioButton_Type.pythonType)) < 0)
         return;
@@ -13506,6 +13647,7 @@ namespace PythonBindings
     Py_INCREF(&(TyXBMCAddon_xbmcgui_ControlProgress_Type.pythonType));
     Py_INCREF(&(TyXBMCAddon_xbmcgui_ControlButton_Type.pythonType));
     Py_INCREF(&(TyXBMCAddon_xbmcgui_ControlGroup_Type.pythonType));
+    Py_INCREF(&(TyXBMCAddon_xbmcgui_ControlVideoWindow_Type.pythonType));
     Py_INCREF(&(TyXBMCAddon_xbmcgui_ControlRadioButton_Type.pythonType));
     Py_INCREF(&(TyXBMCAddon_xbmcgui_ControlSlider_Type.pythonType));
     Py_INCREF(&(TyXBMCAddon_xbmcgui_Dialog_Type.pythonType));
@@ -13533,6 +13675,7 @@ namespace PythonBindings
     PyModule_AddObject(module, "ControlProgress", (PyObject*)(&(TyXBMCAddon_xbmcgui_ControlProgress_Type.pythonType)));
     PyModule_AddObject(module, "ControlButton", (PyObject*)(&(TyXBMCAddon_xbmcgui_ControlButton_Type.pythonType)));
     PyModule_AddObject(module, "ControlGroup", (PyObject*)(&(TyXBMCAddon_xbmcgui_ControlGroup_Type.pythonType)));
+    PyModule_AddObject(module, "ControlVideoWindow", (PyObject*)(&(TyXBMCAddon_xbmcgui_ControlVideoWindow_Type.pythonType)));
     PyModule_AddObject(module, "ControlRadioButton", (PyObject*)(&(TyXBMCAddon_xbmcgui_ControlRadioButton_Type.pythonType)));
     PyModule_AddObject(module, "ControlSlider", (PyObject*)(&(TyXBMCAddon_xbmcgui_ControlSlider_Type.pythonType)));
     PyModule_AddObject(module, "Dialog", (PyObject*)(&(TyXBMCAddon_xbmcgui_Dialog_Type.pythonType)));

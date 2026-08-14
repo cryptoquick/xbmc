@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2005-2018 Team Kodi
+ *  Copyright (C) 2005-2026 Team Kodi
  *  This file is part of Kodi - https://kodi.tv
  *
  *  SPDX-License-Identifier: GPL-2.0-or-later
@@ -28,12 +28,12 @@
 #include "video/VideoInfoTag.h"
 
 #include <chrono>
-#include <functional>
 #include <limits>
 #include <memory>
 #include <string>
 #include <vector>
 
+#include <libbluray/bluray-version.h>
 #include <libbluray/bluray.h>
 #include <libbluray/log_control.h>
 
@@ -259,6 +259,15 @@ bool CDVDInputStreamBluray::Open()
   else
   {
     m_rootPath = root;
+
+#if defined(HAS_UDFREAD)
+    // Only in files mode does libbluray reach the disc through Kodi's filesystem, opening a dozen
+    // or so files and directories on it, and then the clips as they play. On a disc image each of
+    // those opens would otherwise re-mount the image's UDF volume, so keep it mounted for as long
+    // as the disc is open. (Stream mode reads the image itself, disc mode is a physical disc.)
+    m_udfMount.emplace(root);
+#endif
+
     if (!bd_open_files(m_bd, &m_rootPath, CBlurayCallback::dir_open, CBlurayCallback::file_open))
     {
       CLog::Log(LOGERROR, "CDVDInputStreamBluray::Open - failed to open {} in files mode",
@@ -413,6 +422,11 @@ void CDVDInputStreamBluray::Close()
   m_bd = nullptr;
   m_pstream.reset();
   m_rootPath.clear();
+
+#if defined(HAS_UDFREAD)
+  // Released last, as the files opened from the volume are closed above
+  m_udfMount.reset();
+#endif
 }
 
 void CDVDInputStreamBluray::FreeTitleInfo()
@@ -971,6 +985,21 @@ int CDVDInputStreamBluray::GetChapter()
     return static_cast<int>(bd_get_current_chapter(m_bd) + 1);
   else
     return 0;
+}
+
+void CDVDInputStreamBluray::GetChapterName(std::string& name, int ch)
+{
+  name.clear();
+
+#if (BLURAY_VERSION >= BLURAY_VERSION_CODE(1, 5, 0))
+  if (ch == -1 || ch > GetChapterCount())
+    ch = GetChapter();
+  if (ch < 1 || ch > GetChapterCount())
+    return;
+
+  if (m_titleInfo && m_titleInfo->chapters && m_titleInfo->chapters[ch - 1].chapter_name)
+    name = m_titleInfo->chapters[ch - 1].chapter_name;
+#endif
 }
 
 bool CDVDInputStreamBluray::SeekChapter(int ch)

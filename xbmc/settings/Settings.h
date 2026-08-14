@@ -70,6 +70,7 @@ public:
   static constexpr auto SETTING_VIDEOLIBRARY_SHOWUNWATCHEDPLOTS = "videolibrary.showunwatchedplots";
   static constexpr auto SETTING_VIDEOLIBRARY_ACTORTHUMBS = "videolibrary.actorthumbs";
   static constexpr auto SETTING_MYVIDEOS_FLATTEN = "myvideos.flatten";
+  static constexpr auto SETTING_VIDEOLIBRARY_FLATTENVERSIONS = "videolibrary.flattenversions";
   static constexpr auto SETTING_VIDEOLIBRARY_FLATTENTVSHOWS = "videolibrary.flattentvshows";
   static constexpr auto SETTING_VIDEOLIBRARY_TVSHOWSSELECTFIRSTUNWATCHEDITEM =
       "videolibrary.tvshowsselectfirstunwatcheditem";
@@ -97,12 +98,16 @@ public:
   static constexpr auto SETTING_VIDEOLIBRARY_SHOWPERFORMERS =
       "videolibrary.musicvideosallperformers";
   static constexpr auto SETTING_VIDEOLIBRARY_SIMILARVIDEOACTION = "videolibrary.similarvideoaction";
+  static constexpr auto SETTING_VIDEOLIBRARY_NEWVERSIONSAREDEFAULT =
+      "videolibrary.newversionsaredefault";
   static constexpr auto SETTING_VIDEOLIBRARY_IGNOREVIDEOEXTRAS = "videolibrary.ignorevideoextras";
+  static constexpr auto SETTING_VIDEOLIBRARY_ARTRETRIEVALTIMING = "videolibrary.artretrievaltiming";
   static constexpr auto SETTING_LOCALE_AUDIOLANGUAGE = "locale.audiolanguage";
   static constexpr auto SETTING_VIDEOPLAYER_PREFERDEFAULTFLAG = "videoplayer.preferdefaultflag";
   static constexpr auto SETTING_VIDEOPLAYER_AUTOPLAYNEXTITEM = "videoplayer.autoplaynextitem";
   static constexpr auto SETTING_VIDEOPLAYER_SEEKSTEPS = "videoplayer.seeksteps";
   static constexpr auto SETTING_VIDEOPLAYER_SEEKDELAY = "videoplayer.seekdelay";
+  static constexpr auto SETTING_VIDEOPLAYER_MAX_SMOOTH_FF_SPEED = "videoplayer.maxsmoothff";
   static constexpr auto SETTING_VIDEOPLAYER_ADJUSTREFRESHRATE = "videoplayer.adjustrefreshrate";
   static constexpr auto SETTING_VIDEOPLAYER_USEDISPLAYASCLOCK = "videoplayer.usedisplayasclock";
   static constexpr auto SETTING_VIDEOPLAYER_ERRORINASPECT = "videoplayer.errorinaspect";
@@ -180,7 +185,7 @@ public:
   static constexpr auto SETTING_SUBTITLES_DOWNLOADFIRST = "subtitles.downloadfirst";
   static constexpr auto SETTING_SUBTITLES_TV = "subtitles.tv";
   static constexpr auto SETTING_SUBTITLES_MOVIE = "subtitles.movie";
-  static constexpr auto SETTING_DVDS_AUTORUN = "dvds.autorun";
+  static constexpr auto SETTING_DVDS_AUTOACTION = "dvds.autoaction";
   static constexpr auto SETTING_DVDS_PLAYERREGION = "dvds.playerregion";
   static constexpr auto SETTING_DVDS_AUTOMENU = "dvds.automenu";
   static constexpr auto SETTING_DISC_PLAYBACK = "disc.playback";
@@ -442,6 +447,7 @@ public:
   static constexpr auto SETTING_POWERMANAGEMENT_SHUTDOWNSTATE = "powermanagement.shutdownstate";
   static constexpr auto SETTING_POWERMANAGEMENT_WAKEONACCESS = "powermanagement.wakeonaccess";
   static constexpr auto SETTING_POWERMANAGEMENT_WAITFORNETWORK = "powermanagement.waitfornetwork";
+  static constexpr auto SETTING_POWERMANAGEMENT_RESTARTPLAYER = "powermanagement.restartplayer";
   static constexpr auto SETTING_DEBUG_SHOWLOGINFO = "debug.showloginfo";
   static constexpr auto SETTING_DEBUG_EXTRALOGGING = "debug.extralogging";
   static constexpr auto SETTING_DEBUG_SETEXTRALOGLEVEL = "debug.setextraloglevel";

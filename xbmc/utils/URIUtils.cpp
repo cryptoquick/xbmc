@@ -501,6 +501,17 @@ bool URIUtils::GetParentPath(const std::string& strPath, std::string& strParent)
     strParent = url2.Get();
     return !strParent.empty();
   }
+  // Container protocols must be unwrapped first
+  else if (url.IsProtocol("stack"))
+  {
+    strParent = CStackDirectory::GetParentPath(url.Get());
+    return !strParent.empty();
+  }
+  else if (url.IsProtocol("multipath"))
+  {
+    // get the parent path of the first item
+    return GetParentPath(CMultiPathDirectory::GetFirstPath(strPath), strParent);
+  }
   else if (IsBDFile(strPath) || IsDVDFile(strPath))
   {
     std::string folder{GetDirectory(strPath)};
@@ -517,16 +528,6 @@ bool URIUtils::GetParentPath(const std::string& strPath, std::string& strParent)
   {
     strParent = GetDirectory(url.GetHostName());
     return !strParent.empty();
-  }
-  else if (url.IsProtocol("stack"))
-  {
-    strParent = CStackDirectory::GetParentPath(url.Get());
-    return !strParent.empty();
-  }
-  else if (url.IsProtocol("multipath"))
-  {
-    // get the parent path of the first item
-    return GetParentPath(CMultiPathDirectory::GetFirstPath(strPath), strParent);
   }
   else if (url.IsProtocol("plugin"))
   {
@@ -698,6 +699,9 @@ std::string URIUtils::GetDiscUnderlyingFile(const CURL& url)
 
 std::string URIUtils::GetBlurayMenuPath(const std::string& path)
 {
+  if (IsContainerPath(path))
+    return {};
+
   return AddFileToFolder(GetBlurayPath(path), "menu");
 }
 
@@ -705,6 +709,9 @@ std::string URIUtils::GetBlurayTitlesPath(const std::string& path,
                                           GetAllTitles getAllTitles,
                                           AllTitlesOptions options)
 {
+  if (IsContainerPath(path))
+    return {};
+
   std::string newPath{AddFileToFolder(GetBlurayPath(path), "root", "titles")};
   if (options == AllTitlesOptions::EPISODES)
     newPath = AddFileToFolder(newPath, "episodes");
@@ -713,30 +720,48 @@ std::string URIUtils::GetBlurayTitlesPath(const std::string& path,
   return newPath;
 }
 
-std::string URIUtils::GetBlurayMainTitlePath(const std::string& path)
+std::string URIUtils::GetBlurayMainTitlePath(const std::string& path, GetAllTitles getAllTitles)
 {
-  return AddFileToFolder(GetBlurayPath(path), "root", "main");
+  if (IsContainerPath(path))
+    return {};
+
+  std::string newPath{AddFileToFolder(GetBlurayPath(path), "root", "main")};
+  if (getAllTitles == GetAllTitles::ALL)
+    newPath = AddFileToFolder(newPath, "all");
+  return newPath;
 }
 
 std::string URIUtils::GetBlurayEpisodePath(const std::string& path, int season, int episode)
 {
+  if (IsContainerPath(path))
+    return {};
+
   return AddFileToFolder(GetBlurayPath(path), "root", "episode", std::to_string(season),
                          std::to_string(episode));
 }
 
 std::string URIUtils::GetBlurayAllEpisodesPath(const std::string& path)
 {
+  if (IsContainerPath(path))
+    return {};
+
   return AddFileToFolder(GetBlurayPath(path), "root", "episode", "all");
 }
 
 std::string URIUtils::GetBlurayPlaylistPath(const std::string& path, int playlist /* = -1 */)
 {
+  if (IsContainerPath(path))
+    return {};
+
   return AddFileToFolder(GetBlurayPath(path), "BDMV", "PLAYLIST",
                          playlist != -1 ? StringUtils::Format("{:05}.mpls", playlist) : "");
 }
 
 std::string URIUtils::GetBlurayPath(const std::string& path)
 {
+  if (IsContainerPath(path))
+    return {};
+
   if (IsBlurayPath(path))
   {
     // Already bluray:// path
@@ -1131,6 +1156,11 @@ bool URIUtils::IsStack(const std::string& strFile)
   return IsProtocol(strFile, "stack");
 }
 
+bool URIUtils::IsContainerPath(const std::string& strFile)
+{
+  return IsStack(strFile) || IsMultiPath(strFile);
+}
+
 bool URIUtils::IsFavourite(const std::string& strFile)
 {
   return IsProtocol(strFile, "favourites");
@@ -1215,6 +1245,9 @@ bool URIUtils::IsArchive(const CURL& url)
 
 bool URIUtils::IsDiscImage(const std::string& file)
 {
+  if (IsContainerPath(file))
+    return false;
+
   return HasExtension(file, ".img|.iso|.nrg|.udf");
 }
 
@@ -1287,9 +1320,9 @@ bool URIUtils::IsSmb(const std::string& strFile)
   return IsProtocol(strFile, "smb");
 }
 
-bool URIUtils::IsURL(const std::string& strFile)
+bool URIUtils::IsURL(std::string_view file)
 {
-  return strFile.find("://") != std::string::npos;
+  return file.find("://") != std::string::npos;
 }
 
 bool URIUtils::IsFTP(const std::string& strFile)
@@ -1556,6 +1589,9 @@ bool URIUtils::IsOpticalMediaFile(const std::string& file)
 
 bool URIUtils::IsBDFile(const std::string& file)
 {
+  if (IsContainerPath(file))
+    return false;
+
   const std::string fileName{GetFileName(file)};
   return StringUtils::EqualsNoCase(fileName, "index.bdmv") ||
          StringUtils::EqualsNoCase(fileName, "MovieObject.bdmv") ||
@@ -1565,6 +1601,9 @@ bool URIUtils::IsBDFile(const std::string& file)
 
 bool URIUtils::IsDVDFile(const std::string& file)
 {
+  if (IsContainerPath(file))
+    return false;
+
   const std::string fileName{GetFileName(file)};
   return StringUtils::EqualsNoCase(fileName, "video_ts.ifo") ||
          (StringUtils::StartsWithNoCase(fileName, "vts_") &&
@@ -1640,17 +1679,19 @@ void URIUtils::AddSlashAtEnd(std::string& strFolder)
   }
 }
 
-bool URIUtils::HasSlashAtEnd(const std::string& strFile, bool checkURL /* = false */)
+bool URIUtils::HasSlashAtEnd(std::string_view file, bool checkURL /* = false */)
 {
-  if (strFile.empty()) return false;
-  if (checkURL && IsURL(strFile))
-  {
-    CURL url(strFile);
-    const std::string& file = url.GetFileName();
-    return file.empty() || HasSlashAtEnd(file, false);
-  }
-  char kar = strFile.c_str()[strFile.size() - 1];
+  if (file.empty())
+    return false;
 
+  if (checkURL && IsURL(file))
+  {
+    CURL url(std::string{file});
+    const std::string& filename = url.GetFileName();
+    return filename.empty() || HasSlashAtEnd(filename, false);
+  }
+
+  const char kar = file.back();
   if (kar == '/' || kar == '\\')
     return true;
 
@@ -1784,6 +1825,15 @@ std::string URIUtils::AddFileToFolder(const std::string& strFolder,
     StringUtils::Replace(strResult, '/', '\\');
 
   return strResult;
+}
+
+std::string URIUtils::AddFileToFolderMatchingEncoding(const std::string& strFolder,
+                                                      const std::string& strFile)
+{
+  if (HasEncodedFilename(CURL(strFolder)))
+    return AddFileToFolder(strFolder, CURL::Encode(strFile));
+
+  return AddFileToFolder(strFolder, strFile);
 }
 
 std::string URIUtils::GetDirectory(const std::string &strFilePath)
@@ -1989,4 +2039,13 @@ std::string URIUtils::SanitiseUrlEncoding(std::string_view path)
 
   out += path.substr(hostEnd);
   return out;
+}
+
+std::string URIUtils::GetDecodedPath(const std::string& path)
+{
+  std::string decodedPath{path};
+  static constexpr unsigned int MAX_DECODE_PASSES = 5;
+  for (unsigned int i = 0; decodedPath.find('%') != std::string::npos && i < MAX_DECODE_PASSES; ++i)
+    decodedPath = CURL::Decode(decodedPath);
+  return decodedPath;
 }

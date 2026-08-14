@@ -121,6 +121,9 @@
 #include "pvr/guilib/PVRGUIActionsPlayback.h"
 #include "pvr/guilib/PVRGUIActionsPowerManagement.h"
 #include "rendering/RenderSystem.h"
+#include "rendering/capture/CaptureMetadata.h"
+#include "rendering/capture/CapturePixels.h"
+#include "rendering/capture/CaptureService.h"
 #include "resources/LocalizeStrings.h"
 #include "resources/ResourcesComponent.h"
 #include "settings/AdvancedSettings.h"
@@ -261,6 +264,10 @@ bool CApplication::Create()
 
   // Register JobManager service
   CServiceBroker::RegisterJobManager(std::make_shared<CJobManager>());
+
+  // Screen capture service
+  CServiceBroker::RegisterCaptureService(
+      std::make_shared<KODI::RENDERING::CAPTURE::CCaptureService>());
 
   // Announcement service
   m_pAnnouncementManager = std::make_shared<ANNOUNCEMENT::CAnnouncementManager>();
@@ -827,6 +834,53 @@ bool CApplication::OnSettingsSaving() const
   return !m_bStop;
 }
 
+namespace
+{
+// capture tap: serve pending requests from the finished frame before it is
+// presented.
+void ServiceCaptureTaps()
+{
+  using namespace KODI::RENDERING::CAPTURE;
+
+  const auto captureService = CServiceBroker::GetCaptureService();
+  if (!captureService)
+    return;
+
+  const auto requests = captureService->TakeActive(CaptureContent::COMPOSITE);
+  if (requests.empty())
+    return;
+  const auto& request = requests.front(); // at most one consumer per frame
+
+  auto* winSystem = CServiceBroker::GetWinSystem();
+  auto surface = CScreenShot::CreateSurface();
+  if (!winSystem || !surface)
+  {
+    captureService->Fail(request);
+    return;
+  }
+
+  const ScreenshotContext ctx{*winSystem};
+  if (!surface->Read(ctx))
+  {
+    captureService->Fail(request);
+    return;
+  }
+
+  CaptureResult result;
+  result.pixels =
+      std::make_shared<CHeapCapturePixels>(std::unique_ptr<uint8_t[]>(surface->TakeBuffer()));
+  result.width = static_cast<unsigned int>(surface->GetWidth());
+  result.height = static_cast<unsigned int>(surface->GetHeight());
+  result.stride = surface->GetStride();
+  result.format = surface->GetFormat();
+  result.color = GetOutputColorMetadata(*winSystem);
+  result.content = CaptureContent::COMPOSITE; // this tap is the composite half
+
+  captureService->Complete(request, result);
+}
+
+} // namespace
+
 void CApplication::Render()
 {
   // do not render if we are stopped or in background
@@ -887,6 +941,16 @@ void CApplication::Render()
   if (compositing)
     CServiceBroker::GetWinSystem()->CompositeGui();
 
+  // serve pending requests from the finished frame, then fail any left
+  // unserved. Both need a frame that really drew: on a skipped frame nothing
+  // could be served, so FrameComplete would kill live requests.
+  if (hasRendered)
+  {
+    ServiceCaptureTaps();
+    if (const auto captureService = CServiceBroker::GetCaptureService())
+      captureService->FrameComplete();
+  }
+
   CServiceBroker::GetRenderSystem()->EndRender();
 
   // reset our info cache - we do this at the end of Render so that it is
@@ -905,42 +969,6 @@ void CApplication::Render()
                                                        appPlayer->IsRenderingVideoLayer());
 
   CTimeUtils::UpdateFrameTime(hasRendered);
-
-  // [debug hack] count gui-on-screen frames vs total played and skipped
-  {
-    static unsigned int s_video = 0;
-    static unsigned int s_ctrls = 0;
-    static unsigned int s_subs = 0;
-    static unsigned int s_skipGui = 0;
-    static unsigned int s_skipAny = 0;
-    if (!appPlayer->IsPlayingVideo())
-    {
-      s_video = 0;
-      s_ctrls = 0;
-      s_subs = 0;
-      s_skipGui = 0;
-      s_skipAny = 0;
-    }
-    else
-    {
-      ++s_video;
-      const bool ctrlsOn = CServiceBroker::GetGUI()->GetWindowManager().HasVisibleControls();
-      const bool subsOn = appPlayer->HasVisibleOverlay();
-      if (ctrlsOn)
-        ++s_ctrls;
-      if (subsOn)
-        ++s_subs;
-      if (m_skipGuiRender)
-      {
-        ++s_skipAny;
-        if (ctrlsOn || subsOn)
-          ++s_skipGui;
-      }
-      if (s_video % 240 == 0)
-        CLog::Log(LOGDEBUG, "TEMP: [framecount] video={} ctrls={} subs={} skip-gui={} skip-any={}",
-                  s_video, s_ctrls, s_subs, s_skipGui, s_skipAny);
-    }
-  }
 }
 
 bool CApplication::OnAction(const CAction &action)
@@ -1562,6 +1590,12 @@ void CApplication::FrameMove(bool processEvents, bool processGUI)
   {
     m_skipGuiRender = false;
 
+    // a new request, or a latched one-shot still awaiting service, marks the
+    // window manager dirty so an otherwise-idle GUI really renders a frame to tap
+    if (const auto captureService = CServiceBroker::GetCaptureService();
+        captureService && captureService->LatchFrame())
+      CServiceBroker::GetGUI()->GetWindowManager().MarkDirty();
+
     /*! @todo look into the possibility to use this for GBM
     int fps = 0;
 
@@ -1678,6 +1712,8 @@ bool CApplication::Cleanup()
     GetComponent<CApplicationSkinHandling>()->UnloadSkin();
 
     CServiceBroker::UnregisterTextureCache();
+
+    CServiceBroker::UnregisterCaptureService();
 
     // stop all remaining scripts; must be done after skin has been unloaded,
     // not before some windows still need it when deinitializing during skin

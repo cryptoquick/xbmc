@@ -79,7 +79,15 @@ std::string CXBMCTestUtils::ReferenceFilePath(const std::string& path)
 
 bool CXBMCTestUtils::SetReferenceFileBasePath()
 {
-  std::string xbmcPath = CUtil::GetHomePath();
+  /* Testdata is copied next to the kodi-test binary (the CMake build tree).
+   * Do not use CUtil::GetHomePath(): InitDirectoriesLinux(TEST) may have
+   * already set KODI_HOME to INSTALL_PATH, and testdata is NO_INSTALL.
+   */
+  std::string xbmcPath = CUtil::ResolveExecutablePath();
+  if (xbmcPath.empty())
+    return false;
+
+  xbmcPath = URIUtils::GetParentPath(xbmcPath);
   if (xbmcPath.empty())
     return false;
 

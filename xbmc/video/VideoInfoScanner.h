@@ -10,13 +10,17 @@
 
 #include "InfoScanner.h"
 #include "VideoDatabase.h"
+#include "VideoManagerTypes.h"
 #include "addons/Scraper.h"
 #include "settings/VideoVersionsSettings.h"
 #include "utils/Artwork.h"
 #include "utils/RegExp.h"
 
+#include <cstdint>
+#include <functional>
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 class CAdvancedSettings;
@@ -123,7 +127,7 @@ namespace KODI::VIDEO
      \param content content type of the item.
      \param bApplyToDir whether we should apply any thumbs to a folder.  Defaults to false.
      \param useLocal whether we should use local thumbs. Defaults to true.
-     \param actorArtPath the path to search for actor thumbs. Defaults to empty.
+     \param actorArtPath the directory containing actor thumbs. Defaults to empty.
      \param useRemoteArt use remote art if also using local scraper. Defaults to yes.
      */
     void GetArtwork(
@@ -253,12 +257,13 @@ namespace KODI::VIDEO
     /*! \brief Fetch thumbs for actors
      Updates each actor with their thumb (local or online)
      \param actors - vector of SActorInfo
-     \param strPath - path on filesystem to look for local thumbs
+     \param actorsDir - directory holding the local thumbs (ie. a .actors folder, or the actors
+            folder of a library export). Used as given, nothing is appended.
      \param useRemoteArt - use remote art (ie. http://) even if derived from local .nfo file. Defaults to yes.
      */
     void FetchActorThumbs(
         std::vector<SActorInfo>& actors,
-        const std::string& strPath,
+        const std::string& actorsDir,
         UseRemoteArtWithLocalScraper useRemoteArt = UseRemoteArtWithLocalScraper::YES) const;
 
     static int GetPathHash(const CFileItemList &items, std::string &hash);
@@ -274,6 +279,9 @@ namespace KODI::VIDEO
      \return the md5 hash of the folder"
      */
     std::string GetFastHash(const std::string &directory, const std::vector<std::string> &excludes) const;
+
+    /*! \brief As above but from an already known raw modification time */
+    std::string GetFastHash(const std::vector<std::string>& excludes, int64_t time) const;
 
     /*! \brief Retrieve a "fast" hash of the given directory recursively (if available)
      Performs a stat() on the directory, and uses modified time to create a "fast"
@@ -314,11 +322,37 @@ namespace KODI::VIDEO
                                   const CVideoInfoTag& showInfo,
                                   CGUIDialogProgress* pDlgProgress = nullptr);
 
-    bool EnumerateSeriesFolder(CFileItem* item, EPISODELIST& episodeList);
+    enum class EpisodeResult
+    {
+      NO_MEDIA, //!< .nomedia file is present
+      NO_FILES, //!< No episode candidate files found
+      NO_EPISODES, //!< Episode candidate files found, but none could be parsed
+      NOT_CHANGED, //!< No new episodes found (directory hash unchanged)
+      FOUND_EPISODES //!< Episodes found
+    };
+
+    EpisodeResult EnumerateSeriesFolder(CFileItem* item, EPISODELIST& episodeList);
     bool ProcessItemByVideoInfoTag(const CFileItem *item, EPISODELIST &episodeList);
 
     bool AddVideoExtras(CFileItemList& items, ADDON::ContentType content, const std::string& path);
-    bool ProcessVideoVersion(VideoDbContentType itemType, int dbId);
+    static std::pair<VersionConversionResult, int> ProcessVideoVersion(
+        VideoDbContentType itemType, int dbId, int targetDbId = -1, bool canBecomeDefault = true);
+    static void RemovePartNumberFromTitle(int dbId,
+                                          VideoDbContentType itemType,
+                                          CVideoDatabase& db);
+
+    /*!
+     * \brief Add bluray playlists found for the same disc as movie and/or versions.
+     * \param[in] blurayItems all candidate playlists found for the disc
+     * \param[in] scraper scraper used for the lookup
+     * \param[in] bDirNames whether directory names are used for identification
+     * \param[in] useLocal whether to use local information for artwork etc.
+     * \return InfoRet::INFO_ERROR on failure, InfoRet::ADDED if movie added, InfoRet::HAVE_ALREADY if versions added
+     */
+    InfoRet AddBlurayPlaylistVersions(const CFileItemList& blurayItems,
+                                      const ADDON::ScraperPtr& scraper,
+                                      bool bDirNames,
+                                      bool useLocal);
 
     std::pair<InfoType, std::unique_ptr<IVideoInfoTagLoader>> ReadInfoTag(
         CFileItem& item, const ADDON::ScraperPtr& scraper, bool lookInFolder, bool resetTag);
@@ -328,10 +362,56 @@ namespace KODI::VIDEO
 
     SimilarVideoScanAction m_similarVideoAction{SimilarVideoScanAction::NONE};
     bool m_ignoreVideoExtras{false};
+
+    //! Whether the folder a movie is in names it (the scraper's "movies are in separate folders")
+    bool m_useFolderNames{false};
+
+    enum class ArtRetrievalTiming : uint8_t
+    {
+      SYNCHRONOUS = 0, //!< retrieve art synchronously during scrape
+      BACKGROUND = 1 //!< retrieve art in background after scrape
+    };
+
+    ArtRetrievalTiming m_artRetrievalTiming{ArtRetrievalTiming::BACKGROUND};
     CVideoDatabase m_database;
     std::set<int> m_pathsToClean;
     std::shared_ptr<CAdvancedSettings> m_advancedSettings;
     CVideoDatabase::ScraperCache m_scraperCache;
+
+  private:
+    /*!
+     * \brief Remove paths that share missing ancestors with \p directory from the list of paths
+     *        to scan
+     * \param[in] directory The non-existent directory
+     */
+    void SkipRelatedDirectories(std::string_view directory);
+
+    /*!
+     * \brief Removes the directory and sub directories of \p directory from the paths to be
+     *        scanned. Paths must end with a directory separator.
+     * \param[in] directories List of paths
+     * \param[in] directory Path of the directory to remove
+     * \param[in] f function to execute before the removal of a path
+     * \return number of elements removed
+     */
+    static size_t RemoveSubDirectories(std::set<std::string, std::less<>>& directories,
+                                       std::string_view directory,
+                                       std::function<void(const std::string&)> f);
+
+    /*!
+     * \brief Look for the name of an edition known to the library (ex. "Director's Cut") within the
+     *        name of the folder holding a disc. The longest match wins, and a match at the very
+     *        start of the folder name is ignored as that is a movie whose title is an edition name
+     *        (ex. "The Final Cut (2004)") rather than a version of another movie.
+     * \param[in] folderName Name of the folder holding the disc
+     * \return The edition's name as held in the library, empty if none was recognised
+     */
+    std::string GetEditionFromFolderName(const std::string& folderName);
+
     mutable KODI::REGEXP::RegExpCache m_regexpCache;
+
+    //! Editions known to the library, cached for the duration of a scan
+    std::vector<std::string> m_videoVersionTypes;
+    bool m_videoVersionTypesCached{false};
   };
   } // namespace KODI::VIDEO

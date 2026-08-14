@@ -9,8 +9,8 @@
 #include "RendererDRMPRIMEGLES.h"
 
 #include "ServiceBroker.h"
+#include "cores/VideoPlayer/Buffers/VideoBufferDRMPRIME.h"
 #include "cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodec.h"
-#include "cores/VideoPlayer/VideoRenderers/RenderCapture.h"
 #include "cores/VideoPlayer/VideoRenderers/RenderFactory.h"
 #include "cores/VideoPlayer/VideoRenderers/RenderFlags.h"
 #include "cores/VideoPlayer/VideoRenderers/VideoShaders/YUV2RGBShaderGLES.h"
@@ -27,6 +27,7 @@
 #include "windowing/linux/WinSystemEGL.h"
 
 #include <memory>
+#include <typeinfo>
 
 using namespace KODI::UTILS::EGL;
 
@@ -224,10 +225,19 @@ bool CRendererDRMPRIMEGLES::Configure(const VideoPicture& picture,
     }
     else
     {
-      CLog::Log(LOGWARNING, "RendererDRMPRIMEGLES::Configure: limited-range "
-                            "YUV shader compile/link failed; OES path will "
-                            "be used regardless of user setting");
+      CLog::Log(LOGERROR, "RendererDRMPRIMEGLES::Configure: limited-range "
+                          "YUV shader compile/link failed");
     }
+  }
+
+  if (!m_yuvShader && winSystem->UseLimitedColor())
+  {
+    CLog::Log(LOGERROR,
+              "RendererDRMPRIMEGLES::Configure: fourcc {:#x} cannot be converted to limited "
+              "range; switching videoscreen.limitedrange off so the GUI matches the video",
+              sourceFourcc);
+    CServiceBroker::GetSettingsComponent()->GetSettings()->SetBool(
+        CSettings::SETTING_VIDEOSCREEN_LIMITEDRANGE, false);
   }
 
   winSystem->SetColorimetry(&picture);
@@ -280,6 +290,14 @@ void CRendererDRMPRIMEGLES::AddVideoPicture(const VideoPicture& picture, int ind
   }
   buf.videoBuffer = picture.videoBuffer;
   buf.videoBuffer->Acquire();
+
+  //! @todo skip only the exact CVideoBufferDRMPRIMEFFmpeg type, which
+  //! CDVDVideoCodecDRMPRIME always fills at decode; its subclass
+  //! CVideoBufferDMA also arrives from CAddonVideoCodec unfilled, so it is
+  //! set here (a duplicate set for the ffmpeg software path, accepted).
+  auto* drmBuffer = dynamic_cast<CVideoBufferDRMPRIME*>(picture.videoBuffer);
+  if (drmBuffer && typeid(*drmBuffer) != typeid(CVideoBufferDRMPRIMEFFmpeg))
+    drmBuffer->SetPictureParams(picture);
 }
 
 bool CRendererDRMPRIMEGLES::Flush(bool saveBuffers)
@@ -429,13 +447,6 @@ void CRendererDRMPRIMEGLES::RenderUpdate(
   glEnable(GL_BLEND);
 }
 
-bool CRendererDRMPRIMEGLES::RenderCapture(int index, CRenderCapture* capture)
-{
-  capture->BeginRender();
-  capture->EndRender();
-  return true;
-}
-
 bool CRendererDRMPRIMEGLES::ConfigChanged(const VideoPicture& picture)
 {
   if (picture.videoBuffer->GetFormat() != m_format)
@@ -559,9 +570,19 @@ void CRendererDRMPRIMEGLES::Render(unsigned int flags, int index)
   if (!buf.texture.Map(buffer))
     return;
 
-  glBindTexture(GL_TEXTURE_EXTERNAL_OES, buf.texture.GetTexture());
+  DrawTexture(*renderSystem, buf.texture.GetTexture(), m_rotatedDestCoords);
 
-  renderSystem->EnableGUIShader(ShaderMethodGLES::SM_TEXTURE_RGBA_OES);
+  buf.fence->DestroyFence();
+  buf.fence->CreateFence();
+}
+
+void CRendererDRMPRIMEGLES::DrawTexture(CRenderSystemGLES& renderSystem,
+                                        GLuint texture,
+                                        const CPoint dest[4])
+{
+  glBindTexture(GL_TEXTURE_EXTERNAL_OES, texture);
+
+  renderSystem.EnableGUIShader(ShaderMethodGLES::SM_TEXTURE_RGBA_OES);
 
   GLubyte idx[4] = {0, 1, 3, 2}; // Determines order of triangle strip
   GLuint vertexVBO;
@@ -574,34 +595,34 @@ void CRendererDRMPRIMEGLES::Render(unsigned int flags, int index)
 
   std::array<PackedVertex, 4> vertex;
 
-  GLint vertLoc = renderSystem->GUIShaderGetPos();
-  GLint loc = renderSystem->GUIShaderGetCoord0();
-  GLint depthLoc = renderSystem->GUIShaderGetDepth();
+  GLint vertLoc = renderSystem.GUIShaderGetPos();
+  GLint loc = renderSystem.GUIShaderGetCoord0();
+  GLint depthLoc = renderSystem.GUIShaderGetDepth();
 
   // top left
-  vertex[0].x = m_rotatedDestCoords[0].x;
-  vertex[0].y = m_rotatedDestCoords[0].y;
+  vertex[0].x = dest[0].x;
+  vertex[0].y = dest[0].y;
   vertex[0].z = 0.0f;
   vertex[0].u1 = 0.0f;
   vertex[0].v1 = 0.0f;
 
   // top right
-  vertex[1].x = m_rotatedDestCoords[1].x;
-  vertex[1].y = m_rotatedDestCoords[1].y;
+  vertex[1].x = dest[1].x;
+  vertex[1].y = dest[1].y;
   vertex[1].z = 0.0f;
   vertex[1].u1 = 1.0f;
   vertex[1].v1 = 0.0f;
 
   // bottom right
-  vertex[2].x = m_rotatedDestCoords[2].x;
-  vertex[2].y = m_rotatedDestCoords[2].y;
+  vertex[2].x = dest[2].x;
+  vertex[2].y = dest[2].y;
   vertex[2].z = 0.0f;
   vertex[2].u1 = 1.0f;
   vertex[2].v1 = 1.0f;
 
   // bottom left
-  vertex[3].x = m_rotatedDestCoords[3].x;
-  vertex[3].y = m_rotatedDestCoords[3].y;
+  vertex[3].x = dest[3].x;
+  vertex[3].y = dest[3].y;
   vertex[3].z = 0.0f;
   vertex[3].u1 = 0.0f;
   vertex[3].v1 = 1.0f;
@@ -635,12 +656,9 @@ void CRendererDRMPRIMEGLES::Render(unsigned int flags, int index)
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
   glDeleteBuffers(1, &indexVBO);
 
-  renderSystem->DisableGUIShader();
+  renderSystem.DisableGUIShader();
 
   glBindTexture(GL_TEXTURE_EXTERNAL_OES, 0);
-
-  buf.fence->DestroyFence();
-  buf.fence->CreateFence();
 }
 
 bool CRendererDRMPRIMEGLES::Supports(ERENDERFEATURE feature) const

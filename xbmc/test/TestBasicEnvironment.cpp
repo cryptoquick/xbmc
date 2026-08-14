@@ -69,7 +69,10 @@ void TestBasicEnvironment::SetUp()
    */
 
   /* Create a temporary directory and set it to be used throughout the
-   * test suite run.
+   * test suite run. InitDirectoriesLinux(TEST) maps home/masterprofile
+   * under INSTALL_PATH/test_data, which is not writable when the prefix
+   * is a system install. Remap those onto the same temp tree as temp
+   * and profile so tests can persist state (e.g. discstate).
    */
 
   std::error_code ec;
@@ -82,6 +85,8 @@ void TestBasicEnvironment::SetUp()
 
   CSpecialProtocol::SetTempPath(m_tempPath);
   CSpecialProtocol::SetProfilePath(m_tempPath);
+  CSpecialProtocol::SetMasterProfilePath(m_tempPath);
+  CSpecialProtocol::SetHomePath(m_tempPath);
 
   /* Create and delete a tempfile to initialize the VFS (really to initialize
    * CLibcdio). This is done so that the initialization of the VFS does not
@@ -107,9 +112,10 @@ void TestBasicEnvironment::SetUp()
 
 void TestBasicEnvironment::TearDown()
 {
-  XFILE::CDirectory::RemoveRecursive(m_tempPath);
-
   g_application.m_ServiceManager->DeinitTesting();
+
+  // Removal after release of all open files
+  XFILE::CDirectory::RemoveRecursive(m_tempPath);
 
   CServiceBroker::UnregisterAppMessenger();
 

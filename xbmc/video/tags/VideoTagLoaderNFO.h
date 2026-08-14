@@ -9,6 +9,7 @@
 #pragma once
 
 #include "IVideoInfoTagLoader.h"
+#include "NfoFile.h"
 
 #include <string>
 #include <vector>
@@ -32,6 +33,9 @@ public:
                               bool prioritise,
                               std::vector<EmbeddedArt>* = nullptr) override;
 
+  //! \brief Returns the bluray playlist from a <playlist> nfo element, -1 if there isn't one.
+  int GetBlurayPlaylist() const override;
+
 protected:
   //! \brief Find nfo file for item
   //! \param item The item to find NFO file for
@@ -39,4 +43,10 @@ protected:
   std::string FindNFO(const CFileItem& item, bool movieFolder) const;
 
   std::string m_path; //!< Path to nfo file
+
+private:
+  // Cache of the parsed nfo file, populated on the first call to Load()
+  CNfoFile m_nfoReader;
+  bool m_nfoParsed = false;
+  CInfoScanner::InfoType m_parseResult = CInfoScanner::InfoType::NONE;
 };

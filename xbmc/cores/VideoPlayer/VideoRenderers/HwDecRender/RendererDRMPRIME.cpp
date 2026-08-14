@@ -11,8 +11,8 @@
 #include "ServiceBroker.h"
 #include "cores/VideoPlayer/Buffers/VideoBufferDRMPRIME.h"
 #include "cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodec.h"
+#include "cores/VideoPlayer/VideoRenderers/HwDecRender/DRMPRIMECaptureGLES.h"
 #include "cores/VideoPlayer/VideoRenderers/HwDecRender/VideoLayerBridgeDRMPRIME.h"
-#include "cores/VideoPlayer/VideoRenderers/RenderCapture.h"
 #include "cores/VideoPlayer/VideoRenderers/RenderFactory.h"
 #include "cores/VideoPlayer/VideoRenderers/RenderFlags.h"
 #include "settings/DisplaySettings.h"
@@ -23,6 +23,8 @@
 #include "windowing/GraphicContext.h"
 #include "windowing/gbm/WinSystemGbm.h"
 #include "windowing/gbm/drm/DRMAtomic.h"
+
+#include <typeinfo>
 
 using namespace KODI::WINDOWING::GBM;
 
@@ -183,6 +185,14 @@ void CRendererDRMPRIME::AddVideoPicture(const VideoPicture& picture, int index)
   }
   buf.videoBuffer = picture.videoBuffer;
   buf.videoBuffer->Acquire();
+
+  //! @todo skip only the exact CVideoBufferDRMPRIMEFFmpeg type, which
+  //! CDVDVideoCodecDRMPRIME always fills at decode; its subclass
+  //! CVideoBufferDMA also arrives from CAddonVideoCodec unfilled, so it is
+  //! set here (a duplicate set for the ffmpeg software path, accepted).
+  auto* drmBuffer = dynamic_cast<CVideoBufferDRMPRIME*>(picture.videoBuffer);
+  if (drmBuffer && typeid(*drmBuffer) != typeid(CVideoBufferDRMPRIMEFFmpeg))
+    drmBuffer->SetPictureParams(picture);
 }
 
 bool CRendererDRMPRIME::Flush(bool saveBuffers)
@@ -211,6 +221,19 @@ bool CRendererDRMPRIME::NeedBuffer(int index)
     return true;
 
   return false;
+}
+
+bool CRendererDRMPRIME::CaptureVideoFrame(const KODI::RENDERING::CAPTURE::CaptureSpec& spec,
+                                          KODI::RENDERING::CAPTURE::CaptureResult& result)
+{
+  if (m_iLastRenderBuffer < 0)
+    return false;
+
+  auto* buffer = dynamic_cast<CVideoBufferDRMPRIME*>(m_buffers[m_iLastRenderBuffer].videoBuffer);
+  if (!buffer || !buffer->IsValid())
+    return false;
+
+  return CaptureDRMPRIMEVideo(buffer, spec, result);
 }
 
 CRenderInfo CRendererDRMPRIME::GetRenderInfo()
@@ -258,13 +281,6 @@ void CRendererDRMPRIME::RenderUpdate(
   m_videoLayerBridge->SetVideoPlane(buffer, m_planeDestRect);
 
   m_iLastRenderBuffer = index;
-}
-
-bool CRendererDRMPRIME::RenderCapture(int index, CRenderCapture* capture)
-{
-  capture->BeginRender();
-  capture->EndRender();
-  return true;
 }
 
 bool CRendererDRMPRIME::ConfigChanged(const VideoPicture& picture)

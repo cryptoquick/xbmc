@@ -24,6 +24,7 @@
 #include "application/ApplicationPlayer.h"
 #include "application/ApplicationPowerHandling.h"
 #include "cores/playercorefactory/PlayerCoreFactory.h"
+#include "filesystem/File.h"
 #include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
 #include "input/actions/Action.h"
@@ -32,6 +33,7 @@
 #include "messaging/ApplicationMessenger.h"
 #include "music/MusicDatabase.h"
 #include "music/MusicFileItemClassify.h"
+#include "music/tags/MusicInfoTag.h"
 #include "pictures/SlideShowDelegator.h"
 #include "pvr/PVRManager.h"
 #include "pvr/PVRPlaybackState.h"
@@ -76,6 +78,44 @@ void AppendSubtitleStreamFlagsAsBooleans(CVariant& list, StreamFlags flags)
   list["isdefault"] = ((flags & StreamFlags::FLAG_DEFAULT) != 0);
   list["isforced"] = ((flags & StreamFlags::FLAG_FORCED) != 0);
   list["isimpaired"] = ((flags & StreamFlags::FLAG_HEARING_IMPAIRED) != 0);
+}
+
+bool IsReachable(const CFileItem& item)
+{
+  const std::string& path = item.GetDynPath();
+
+  // Only plain files can be cheaply verified. Anything resolved by a plugin, served
+  // over the network as a stream, or addressed as a container is left to the player.
+  // Stacks in particular have no CFileFactory loader, so CFile::Exists() would always
+  // report them missing.
+  if (item.IsFolder() || path.empty() || URIUtils::IsPlugin(path) || URIUtils::IsUPnP(path) ||
+      URIUtils::IsInternetStream(path) || URIUtils::IsBlurayPath(path) || URIUtils::IsStack(path))
+    return true;
+
+  // Bypass the directory cache; a cached hit would mask a share that has gone away.
+  return XFILE::CFile::Exists(path, false);
+}
+
+void OverlayCurrentSongTag(CFileItem& item)
+{
+  const MUSIC_INFO::CMusicInfoTag* current{
+      CServiceBroker::GetGUI()->GetInfoManager().GetCurrentSongTag()};
+  if (!current)
+    return;
+
+  // Only copy what the source actually supplied, so anything the item already carries in its
+  // own right survives.
+  MUSIC_INFO::CMusicInfoTag& tag{*item.GetMusicInfoTag()};
+  if (!current->GetTitle().empty())
+    tag.SetTitle(current->GetTitle());
+  if (!current->GetArtist().empty())
+    tag.SetArtist(current->GetArtist());
+  if (!current->GetAlbum().empty())
+    tag.SetAlbum(current->GetAlbum());
+  if (!current->GetGenre().empty())
+    tag.SetGenre(current->GetGenre());
+  if (!current->GetStationName().empty())
+    tag.SetStationName(current->GetStationName());
 }
 
 } // namespace
@@ -187,7 +227,12 @@ JSONRPC_STATUS CPlayerOperations::GetItem(const std::string &method, ITransportL
     {
       fileItem = std::make_shared<CFileItem>(g_application.CurrentFileItem());
       if (IsPVRChannel())
+      {
+        // Metadata that arrives mid-stream reaches only the item held by the GUI, so overlay
+        // it here. The channel item stays authoritative for identity, path and artwork.
+        OverlayCurrentSongTag(*fileItem);
         break;
+      }
 
       if (player == Video)
       {
@@ -1044,6 +1089,11 @@ JSONRPC_STATUS CPlayerOperations::Open(const std::string &method, ITransportLaye
         // Handle "resume" option
         if (list.Size() == 1)
           HandleResumeOption(optionResume, *list[0]);
+
+        // Playback is posted asynchronously, so nothing after this point can be reported
+        // back to the caller. Report an addressable single item that cannot be reached.
+        if (list.Size() == 1 && !IsReachable(*list[0]))
+          return Unavailable;
 
         auto l = new CFileItemList(); //don't delete
         l->Copy(list);

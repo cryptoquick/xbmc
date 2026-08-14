@@ -83,16 +83,20 @@ CInfoScanner::InfoType CVideoTagLoaderNFO::Load(CVideoInfoTag& tag,
   CInfoScanner::InfoType result = NONE;
   if (m_info)
   {
-    CNfoFile nfoReader;
-    result = nfoReader.Create(m_path, m_info, GetNfoIndex(m_item, m_info));
+    if (!m_nfoParsed)
+    {
+      m_parseResult = m_nfoReader.Create(m_path, m_info, GetNfoIndex(m_item, m_info));
+      m_nfoParsed = true;
+    }
+    result = m_parseResult;
 
     if (result == FULL || result == COMBINED || result == OVERRIDE)
-      nfoReader.GetDetails(tag, nullptr, prioritise);
+      m_nfoReader.GetDetails(tag, nullptr, prioritise);
 
     if (result == URL || result == COMBINED)
     {
-      m_url = nfoReader.ScraperUrl();
-      m_info = nfoReader.GetScraperInfo();
+      m_url = m_nfoReader.ScraperUrl();
+      m_info = m_nfoReader.GetScraperInfo();
     }
   }
 
@@ -116,6 +120,14 @@ CInfoScanner::InfoType CVideoTagLoaderNFO::Load(CVideoInfoTag& tag,
   }
 
   return result;
+}
+
+int CVideoTagLoaderNFO::GetBlurayPlaylist() const
+{
+  if (!m_nfoParsed)
+    return -1;
+
+  return m_nfoReader.GetBlurayPlaylist();
 }
 
 std::string CVideoTagLoaderNFO::FindNFO(const CFileItem& item,
@@ -232,8 +244,9 @@ std::string CVideoTagLoaderNFO::FindNFO(const CFileItem& item,
     // see if there is a unique nfo file in this folder, and if so, use that
     // if we are looking for a specific episode nfo the file name must end with SxxEyy
     // (otherwise it could match the wrong episode nfo)
-    const std::string strPath{item.IsFolder() ? item.GetPath()
-                                              : URIUtils::GetDirectory(item.GetPath())};
+    const std::string strPath{item.IsFolder()  ? item.GetPath()
+                              : item.IsStack() ? CStackDirectory::GetBasePath(item.GetPath())
+                                               : URIUtils::GetDirectory(item.GetPath())};
     CFileItemList items;
     if (CDirectory::GetDirectory(strPath, items, ".nfo", DIR_FLAG_DEFAULTS) && !items.IsEmpty())
     {

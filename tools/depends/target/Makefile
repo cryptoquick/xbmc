@@ -44,7 +44,7 @@ endif
 
 ifeq ($(OS),darwin_embedded)
   EXCLUDED_DEPENDS = libusb libcdio libcdio-gplv3
-  ifeq ($(TARGET_PLATFORM),appletvos)
+  ifeq ($(findstring appletv,$(TARGET_PLATFORM)),appletv)
     EXCLUDED_DEPENDS += libshairplay libplist
   endif
   DEPENDS += darwin-embedded-entitlements
@@ -150,7 +150,6 @@ $(DOWNLOAD_TARGETS):
 
 download: $(DOWNLOAD_TARGETS)
 
-cec: p8-platform
 crossguid: $(LIBUUID)
 curl: brotli openssl nghttp2 $(ZLIB)
 dbus: expat

@@ -1103,6 +1103,62 @@ namespace PythonBindings
     return result; 
   } 
 
+  static PyObject* xbmc_getDatabaseName (PyObject* self  , PyObject *args, PyObject *kwds  )
+  {
+    XBMC_TRACE;
+
+    static const char *keywords[] = {
+          "dbType",
+          NULL};
+
+    char * dbType  = nullptr;
+    if (!PyArg_ParseTupleAndKeywords(
+       args,
+       kwds,
+       "s",
+       const_cast<char**>(keywords),
+         &dbType
+       ))
+    {
+      return NULL;
+    }
+
+    XBMCAddon::String  apiResult;
+    try
+    {
+
+      XBMCAddon::SetLanguageHookGuard slhg(XBMCAddon::Python::PythonLanguageHook::GetIfExists(PyThreadState_Get()->interp).get());
+      apiResult = XBMCAddon::xbmc::getDatabaseName(  dbType  );
+
+    }
+    catch (const XBMCAddon::WrongTypeException& e)
+    {
+      CLog::Log(LOGERROR,"EXCEPTION: {}",e.GetExMessage());
+      PyErr_SetString(PyExc_TypeError, e.GetExMessage()); 
+      return NULL; 
+    }
+    catch (const XbmcCommons::Exception& e)
+    {
+      CLog::Log(LOGERROR,"EXCEPTION: {}",e.GetExMessage());
+      PyErr_SetString(PyExc_RuntimeError, e.GetExMessage()); 
+      return NULL; 
+    }
+    catch (...)
+    {
+      CLog::Log(LOGERROR,"EXCEPTION: Unknown exception thrown from the call \"XBMCAddon::xbmc::getDatabaseName\"");
+      PyErr_SetString(PyExc_RuntimeError, "Unknown exception thrown from the call \"XBMCAddon::xbmc::getDatabaseName\""); 
+      return NULL; 
+    }
+
+    PyObject* result = Py_None;
+
+    // transform the result
+    result = PyUnicode_DecodeUTF8(apiResult.c_str(),apiResult.size(),"surrogateescape");
+
+
+    return result; 
+  } 
+
   static PyObject* xbmc_playSFX (PyObject* self  , PyObject *args, PyObject *kwds  )
   {
     XBMC_TRACE;
@@ -1346,6 +1402,113 @@ namespace PythonBindings
 
     // transform the result
     result = Py_BuildValue("i", apiResult);
+
+    return result; 
+  } 
+
+  static PyObject* xbmc_getDevicePowerStatus (PyObject* self  , PyObject *args, PyObject *kwds  )
+  {
+    XBMC_TRACE;
+
+    static const char *keywords[] = {
+          "adapterName",
+          NULL};
+
+    std::string  adapterName  = XBMCAddon::emptyString;
+    PyObject* pyadapterName = NULL;
+    if (!PyArg_ParseTupleAndKeywords(
+       args,
+       kwds,
+       "|O",
+       const_cast<char**>(keywords),
+         &pyadapterName
+       ))
+    {
+      return NULL;
+    }
+
+    int  apiResult;
+    try
+    {
+      if (pyadapterName) PyXBMCGetUnicodeString(adapterName,pyadapterName,false,"adapterName","XBMCAddon::xbmc::getDevicePowerStatus"); 
+
+      XBMCAddon::SetLanguageHookGuard slhg(XBMCAddon::Python::PythonLanguageHook::GetIfExists(PyThreadState_Get()->interp).get());
+      apiResult = XBMCAddon::xbmc::getDevicePowerStatus(  adapterName  );
+
+    }
+    catch (const XBMCAddon::WrongTypeException& e)
+    {
+      CLog::Log(LOGERROR,"EXCEPTION: {}",e.GetExMessage());
+      PyErr_SetString(PyExc_TypeError, e.GetExMessage()); 
+      return NULL; 
+    }
+    catch (const XbmcCommons::Exception& e)
+    {
+      CLog::Log(LOGERROR,"EXCEPTION: {}",e.GetExMessage());
+      PyErr_SetString(PyExc_RuntimeError, e.GetExMessage()); 
+      return NULL; 
+    }
+    catch (...)
+    {
+      CLog::Log(LOGERROR,"EXCEPTION: Unknown exception thrown from the call \"XBMCAddon::xbmc::getDevicePowerStatus\"");
+      PyErr_SetString(PyExc_RuntimeError, "Unknown exception thrown from the call \"XBMCAddon::xbmc::getDevicePowerStatus\""); 
+      return NULL; 
+    }
+
+    PyObject* result = Py_None;
+
+    // transform the result
+    result = Py_BuildValue("i", apiResult);
+
+    return result; 
+  } 
+
+  static PyObject* xbmc_getCecAdapterNames (PyObject* self  , PyObject *args, PyObject *kwds  )
+  {
+    XBMC_TRACE;
+    std::vector< XBMCAddon::String  >  apiResult;
+    try
+    {
+
+      XBMCAddon::SetLanguageHookGuard slhg(XBMCAddon::Python::PythonLanguageHook::GetIfExists(PyThreadState_Get()->interp).get());
+      apiResult = XBMCAddon::xbmc::getCecAdapterNames(  );
+
+    }
+    catch (const XBMCAddon::WrongTypeException& e)
+    {
+      CLog::Log(LOGERROR,"EXCEPTION: {}",e.GetExMessage());
+      PyErr_SetString(PyExc_TypeError, e.GetExMessage()); 
+      return NULL; 
+    }
+    catch (const XbmcCommons::Exception& e)
+    {
+      CLog::Log(LOGERROR,"EXCEPTION: {}",e.GetExMessage());
+      PyErr_SetString(PyExc_RuntimeError, e.GetExMessage()); 
+      return NULL; 
+    }
+    catch (...)
+    {
+      CLog::Log(LOGERROR,"EXCEPTION: Unknown exception thrown from the call \"XBMCAddon::xbmc::getCecAdapterNames\"");
+      PyErr_SetString(PyExc_RuntimeError, "Unknown exception thrown from the call \"XBMCAddon::xbmc::getCecAdapterNames\""); 
+      return NULL; 
+    }
+
+    PyObject* result = Py_None;
+
+    // transform the result
+    
+      result = PyList_New(0);
+
+      for (std::vector<XBMCAddon::String >::iterator iter = apiResult.begin(); iter != apiResult.end(); ++iter)
+      {
+        PyObject* pyentry1;
+        pyentry1 = PyUnicode_DecodeUTF8((*iter).c_str(),(*iter).size(),"surrogateescape");
+
+        PyList_Append(result, pyentry1);
+        Py_DECREF(pyentry1);
+      }
+
+
 
     return result; 
   } 
@@ -19112,11 +19275,14 @@ namespace PythonBindings
     {"getFreeMem", (PyCFunction)xbmc_getFreeMem, METH_VARARGS|METH_KEYWORDS, NULL }, 
     {"getInfoLabel", (PyCFunction)xbmc_getInfoLabel, METH_VARARGS|METH_KEYWORDS, NULL }, 
     {"getInfoImage", (PyCFunction)xbmc_getInfoImage, METH_VARARGS|METH_KEYWORDS, NULL }, 
+    {"getDatabaseName", (PyCFunction)xbmc_getDatabaseName, METH_VARARGS|METH_KEYWORDS, NULL }, 
     {"playSFX", (PyCFunction)xbmc_playSFX, METH_VARARGS|METH_KEYWORDS, NULL }, 
     {"stopSFX", (PyCFunction)xbmc_stopSFX, METH_VARARGS|METH_KEYWORDS, NULL }, 
     {"enableNavSounds", (PyCFunction)xbmc_enableNavSounds, METH_VARARGS|METH_KEYWORDS, NULL }, 
     {"getCondVisibility", (PyCFunction)xbmc_getCondVisibility, METH_VARARGS|METH_KEYWORDS, NULL }, 
     {"getGlobalIdleTime", (PyCFunction)xbmc_getGlobalIdleTime, METH_VARARGS|METH_KEYWORDS, NULL }, 
+    {"getDevicePowerStatus", (PyCFunction)xbmc_getDevicePowerStatus, METH_VARARGS|METH_KEYWORDS, NULL }, 
+    {"getCecAdapterNames", (PyCFunction)xbmc_getCecAdapterNames, METH_VARARGS|METH_KEYWORDS, NULL }, 
     {"getCacheThumbName", (PyCFunction)xbmc_getCacheThumbName, METH_VARARGS|METH_KEYWORDS, NULL }, 
     {"getCleanMovieTitle", (PyCFunction)xbmc_getCleanMovieTitle, METH_VARARGS|METH_KEYWORDS, NULL }, 
     {"getRegion", (PyCFunction)xbmc_getRegion, METH_VARARGS|METH_KEYWORDS, NULL }, 
@@ -19271,6 +19437,12 @@ namespace PythonBindings
    PyModule_AddIntConstant(module,"ISO_639_1",getISO_639_1()); 
    PyModule_AddIntConstant(module,"ISO_639_2",getISO_639_2()); 
    PyModule_AddIntConstant(module,"ENGLISH_NAME",getENGLISH_NAME()); 
+   PyModule_AddIntConstant(module,"DEVICE_POWER_NO_ADAPTER",getDEVICE_POWER_NO_ADAPTER()); 
+   PyModule_AddIntConstant(module,"DEVICE_POWER_ON",getDEVICE_POWER_ON()); 
+   PyModule_AddIntConstant(module,"DEVICE_POWER_STANDBY",getDEVICE_POWER_STANDBY()); 
+   PyModule_AddIntConstant(module,"DEVICE_POWER_TRANSITION_TO_ON",getDEVICE_POWER_TRANSITION_TO_ON()); 
+   PyModule_AddIntConstant(module,"DEVICE_POWER_TRANSITION_TO_STANDBY",getDEVICE_POWER_TRANSITION_TO_STANDBY()); 
+   PyModule_AddIntConstant(module,"DEVICE_POWER_UNKNOWN",getDEVICE_POWER_UNKNOWN()); 
   // constexpr constants
 
   return module;

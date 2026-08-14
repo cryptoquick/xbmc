@@ -36,6 +36,7 @@
 #include "utils/XTimeUtils.h"
 #include "utils/log.h"
 
+#include <map>
 #include <memory>
 #include <mutex>
 #include <sstream>
@@ -480,19 +481,34 @@ bool CDVDDemuxFFmpeg::Open(const std::shared_ptr<CDVDInputStream>& pInput, bool 
                          "empty. Please report this bug.");
   }
 
-  // don't re-open mpegts streams with hevc encoding as the params are not correctly detected again
-  if (iformat && (strcmp(iformat->name, "mpegts") == 0) && !url.IsProtocol("tcp") && !fileinfo &&
-      !isBluray && m_pFormatContext->nb_streams > 0 && m_pFormatContext->streams != nullptr &&
-      m_pFormatContext->streams[0]->codecpar->codec_id != AV_CODEC_ID_HEVC)
+  // Don't apply the mpegts analyzeduration optimization if any stream needs full analysis:
+  // HEVC params break on reopen; DTS and TrueHD need full analyzeduration for extensions and channels
+  // (DTS channel/sample-rate detection is unreliable at a truncated analyzeduration even for core DTS).
+  bool skipTsOptimization = false;
+  bool isMpegTsWithStreams = iformat && (strcmp(iformat->name, "mpegts") == 0) &&
+                             m_pFormatContext->nb_streams > 0 &&
+                             m_pFormatContext->streams != nullptr;
+  if (isMpegTsWithStreams)
+  {
+    for (unsigned int i = 0; i < m_pFormatContext->nb_streams; i++)
+    {
+      AVCodecID codec = m_pFormatContext->streams[i]->codecpar->codec_id;
+      if (codec == AV_CODEC_ID_HEVC || codec == AV_CODEC_ID_DTS || codec == AV_CODEC_ID_TRUEHD)
+      {
+        skipTsOptimization = true;
+        break;
+      }
+    }
+  }
+
+  if (isMpegTsWithStreams && !url.IsProtocol("tcp") && !fileinfo && !isBluray &&
+      !skipTsOptimization)
   {
     av_opt_set_int(m_pFormatContext, "analyzeduration", 500000, 0);
     m_checkTransportStream = true;
     skipCreateStreams = true;
   }
-  else if (!iformat || ((strcmp(iformat->name, "mpegts") != 0) ||
-                        ((strcmp(iformat->name, "mpegts") == 0) &&
-                         m_pFormatContext->nb_streams > 0 && m_pFormatContext->streams != nullptr &&
-                         m_pFormatContext->streams[0]->codecpar->codec_id == AV_CODEC_ID_HEVC)))
+  else if (!iformat || strcmp(iformat->name, "mpegts") != 0 || skipTsOptimization)
   {
     m_streaminfo = true;
   }
@@ -705,8 +721,13 @@ void CDVDDemuxFFmpeg::SetSpeed(int iSpeed)
     av_read_play(m_pFormatContext);
   m_speed = iSpeed;
 
+  int maxSmoothFF = 4;
+  if (auto comp = CServiceBroker::GetSettingsComponent(); comp != nullptr)
+    if (auto settings = comp->GetSettings(); settings != nullptr)
+      maxSmoothFF = settings->GetInt(CSettings::SETTING_VIDEOPLAYER_MAX_SMOOTH_FF_SPEED);
+
   AVDiscard discard = AVDISCARD_NONE;
-  if (m_speed > 4 * DVD_PLAYSPEED_NORMAL)
+  if (m_speed > maxSmoothFF * DVD_PLAYSPEED_NORMAL)
     discard = AVDISCARD_NONKEY;
   else if (m_speed > 2 * DVD_PLAYSPEED_NORMAL)
     discard = AVDISCARD_BIDIR;
@@ -1483,6 +1504,22 @@ double CDVDDemuxFFmpeg::SelectAspect(AVStream* st, bool& forced)
 
 void CDVDDemuxFFmpeg::CreateStreams(unsigned int program)
 {
+  // changes must keep increasing across rebuilds; consumers detect a rebuild by comparing values
+  std::map<int, int> prevChanges;
+  for (const auto& [streamIdx, stream] : m_streams)
+    prevChanges[streamIdx] = stream->changes;
+
+  // only carries on the rebuild path; on Open() m_streams is empty and there is nothing to carry
+  const auto addStreamKeepingChanges = [this, &prevChanges](int streamIdx)
+  {
+    CDemuxStream* stream = AddStream(streamIdx);
+    if (!stream)
+      return;
+
+    if (const auto it = prevChanges.find(streamIdx); it != prevChanges.end())
+      stream->changes = it->second + 1;
+  };
+
   DisposeStreams();
 
   // add the ffmpeg streams to our own stream map
@@ -1518,7 +1555,7 @@ void CDVDDemuxFFmpeg::CreateStreams(unsigned int program)
       {
         int streamIdx = m_pFormatContext->programs[m_program]->stream_index[i];
         m_pFormatContext->streams[streamIdx]->discard = AVDISCARD_NONE;
-        AddStream(streamIdx);
+        addStreamKeepingChanges(streamIdx);
       }
 
       // discard all unneeded streams
@@ -1537,7 +1574,7 @@ void CDVDDemuxFFmpeg::CreateStreams(unsigned int program)
   if (m_program == UINT_MAX)
   {
     for (unsigned int i = 0; i < m_pFormatContext->nb_streams; i++)
-      AddStream(i);
+      addStreamKeepingChanges(static_cast<int>(i));
   }
 }
 
@@ -1623,23 +1660,17 @@ CDemuxStream* CDVDDemuxFFmpeg::AddStream(int streamIdx)
         if (m_bAVI && pStream->codecpar->codec_id == AV_CODEC_ID_H264)
           st->bPTSInvalid = true;
 
-        AVRational r_frame_rate = pStream->r_frame_rate;
+        AVRational frameRate = av_guess_frame_rate(m_pFormatContext, pStream, nullptr);
 
-        //average fps is more accurate for mkv files
-        if (m_bMatroska && pStream->avg_frame_rate.den && pStream->avg_frame_rate.num)
+        // av_guess_frame_rate prefers r_frame_rate, which is the peak rate for VFR
+        // content; average fps is more accurate where the container provides it
+        if (m_bMatroska && pStream->avg_frame_rate.num > 0 && pStream->avg_frame_rate.den > 0)
+          frameRate = pStream->avg_frame_rate;
+
+        if (frameRate.num > 0 && frameRate.den > 0)
         {
-          st->iFpsRate = pStream->avg_frame_rate.num;
-          st->iFpsScale = pStream->avg_frame_rate.den;
-        }
-        else if (r_frame_rate.den && r_frame_rate.num)
-        {
-          st->iFpsRate = r_frame_rate.num;
-          st->iFpsScale = r_frame_rate.den;
-        }
-        else
-        {
-          st->iFpsRate  = 0;
-          st->iFpsScale = 0;
+          st->iFpsRate = frameRate.num;
+          st->iFpsScale = frameRate.den;
         }
 
         st->interlaced = pStream->codecpar->field_order == AV_FIELD_TT ||
@@ -2000,6 +2031,8 @@ void CDVDDemuxFFmpeg::AddStream(int streamIdx, CDemuxStream* stream)
   }
   else
   {
+    // changes must keep increasing across replacements; consumers detect them by comparing values
+    stream->changes = res.first->second->changes + 1;
     delete res.first->second;
     res.first->second = stream;
   }
